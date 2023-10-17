@@ -8,7 +8,6 @@ build
 *.log
 *.json
 *.wandb
-*.txt
 *.yaml
 *.DS_Store
 *.sbatch
