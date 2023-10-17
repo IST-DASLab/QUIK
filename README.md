@@ -8,6 +8,7 @@ This repository contains the code for QUIK, weights and activations post-trainin
 - cmake
 - C++ compiler (GCC/clang/...)
 - nvcc
+- [cusparseLt](https://docs.nvidia.com/cuda/cusparselt/index.html)
 
 ### Instructions
 

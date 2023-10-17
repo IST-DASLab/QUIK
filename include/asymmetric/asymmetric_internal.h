@@ -2,8 +2,8 @@
 #include <torch/extension.h>
 
 namespace QUIK::asymmetric {
-torch::Tensor quantizeCUDAOld(const torch::Tensor &src, const torch::Tensor &meta,
-                           const int bits);
+torch::Tensor quantizeCUDAOld(const torch::Tensor &src,
+                              const torch::Tensor &meta, const int bits);
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
     const torch::Tensor &src, const torch::Tensor &int_indices,

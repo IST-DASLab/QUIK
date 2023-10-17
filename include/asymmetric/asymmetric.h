@@ -3,4 +3,4 @@
 
 namespace QUIK::asymmetric {
 void buildSubmodule(pybind11::module &mod);
-} // namespace QUIK::asymmetric
+}  // namespace QUIK::asymmetric
