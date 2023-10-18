@@ -1,14 +1,9 @@
-cmake_minimum_required(VERSION 3.11)  # for FetchContent
+cmake_minimum_required(VERSION 3.11)
 project(quik LANGUAGES CXX)
 
-include(FetchContent)
-set(PYBIND11_VERSION v2.10.3)
-set(CUTLASS_VERSION v3.1.0)
-set(FMT_VERSION 10.1.0)
-
-if(NOT CMAKE_BUILD_TYPE)
+if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
-endif()
+endif ()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,37 +13,39 @@ find_package(OpenMP REQUIRED)            # -Xpreprocessor -fopenmp
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # -fPIC
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)  # -fvisibility=hidden
 
-if(MSVC)
+option(BUILD_QUIK_UNIT_TEST "Enable quik unit test." off)
+
+if (MSVC)
     string(APPEND CMAKE_CXX_FLAGS " /Wall")
     string(APPEND CMAKE_CXX_FLAGS_DEBUG " /Zi")
     string(APPEND CMAKE_CXX_FLAGS_RELEASE " /O2 /Ob2")
-else()
+else ()
     string(APPEND CMAKE_CXX_FLAGS " -Wall")
     string(APPEND CMAKE_CXX_FLAGS_DEBUG " -g -Og")
     string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3")
-endif()
+endif ()
 
 set(USE_FP16 ON)
 
-if(NOT DEFINED USE_FP16 AND NOT "$ENV{USE_FP16}" STREQUAL "")
+if (NOT DEFINED USE_FP16 AND NOT "$ENV{USE_FP16}" STREQUAL "")
     set(USE_FP16 "$ENV{USE_FP16}")
-endif()
+endif ()
 
-if(NOT DEFINED USE_FP16)
+if (NOT DEFINED USE_FP16)
     set(USE_FP16 OFF)
     message(WARNING "FP16 support disabled, compiling without torch.HalfTensor. Suppress this warning with -DUSE_FP16=ON or -DUSE_FP16=OFF.")
-elseif(USE_FP16)
+elseif (USE_FP16)
     message(STATUS "FP16 support enabled, compiling with torch.HalfTensor.")
-else()
+else ()
     message(STATUS "FP16 support disabled, compiling without torch.HalfTensor.")
-endif()
+endif ()
 
-if(USE_FP16)
+if (USE_FP16)
     add_definitions(-DUSE_FP16)
-endif()
+endif ()
 
-find_package(CUDA)
-if(CUDA_FOUND AND NOT WIN32)
+find_package(CUDA REQUIRED)
+if (CUDA_FOUND AND NOT WIN32)
     message(STATUS "Found CUDA, enabling CUDA support.")
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD "${CMAKE_CXX_STANDARD}")
@@ -57,14 +54,14 @@ if(CUDA_FOUND AND NOT WIN32)
 
     string(APPEND CMAKE_CUDA_FLAGS " $ENV{TORCH_NVCC_FLAGS}")
 
-    if(NOT DEFINED TORCH_CUDA_ARCH_LIST AND NOT "$ENV{TORCH_CUDA_ARCH_LIST}" STREQUAL "")
+    if (NOT DEFINED TORCH_CUDA_ARCH_LIST AND NOT "$ENV{TORCH_CUDA_ARCH_LIST}" STREQUAL "")
         set(TORCH_CUDA_ARCH_LIST "$ENV{TORCH_CUDA_ARCH_LIST}")
-    endif()
+    endif ()
 
-    if(NOT TORCH_CUDA_ARCH_LIST)
+    if (NOT TORCH_CUDA_ARCH_LIST)
         set(TORCH_CUDA_ARCH_LIST "Auto")
         message(WARNING "Torch CUDA arch list is not set, setting to \"Auto\". Suppress this warning with -DTORCH_CUDA_ARCH_LIST=Common.")
-    endif()
+    endif ()
 
     set(CMAKE_CUDA_ARCHITECTURES OFF)
     cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS ${TORCH_CUDA_ARCH_LIST})
@@ -73,7 +70,7 @@ if(CUDA_FOUND AND NOT WIN32)
     list(APPEND CUDA_NVCC_FLAGS ${CUDA_ARCH_FLAGS})
 
     list(APPEND CUDA_NVCC_FLAGS "--expt-relaxed-constexpr" "--expt-extended-lambda")
-    if(CUDA_HAS_FP16 OR NOT "${CUDA_VERSION}" VERSION_LESS "7.5")
+    if (CUDA_HAS_FP16 OR NOT "${CUDA_VERSION}" VERSION_LESS "7.5")
         if (USE_FP16)
             message(STATUS "Found CUDA with FP16 support, compiling with torch.cuda.HalfTensor.")
             string(APPEND CMAKE_CUDA_FLAGS " -DCUDA_HAS_FP16=1"
@@ -81,33 +78,33 @@ if(CUDA_FOUND AND NOT WIN32)
                     " -D__CUDA_NO_HALF_CONVERSIONS__"
                     " -D__CUDA_NO_HALF2_OPERATORS__"
                     " -D__CUDA_NO_BFLOAT16_CONVERSIONS__")
-        else()
+        else ()
             message(STATUS "Found CUDA with FP16 support, but it is suppressed by the compile options, compiling without torch.cuda.HalfTensor.")
-        endif()
-    else()
+        endif ()
+    else ()
         message(STATUS "Could not find CUDA with FP16 support, compiling without torch.cuda.HalfTensor.")
-    endif()
+    endif ()
 
-    foreach(FLAG ${CUDA_NVCC_FLAGS})
+    foreach (FLAG ${CUDA_NVCC_FLAGS})
         string(FIND "${FLAG}" " " flag_space_position)
-        if(NOT flag_space_position EQUAL -1)
+        if (NOT flag_space_position EQUAL -1)
             message(FATAL_ERROR "Found spaces in CUDA_NVCC_FLAGS entry '${FLAG}'")
-        endif()
+        endif ()
         string(APPEND CMAKE_CUDA_FLAGS " ${FLAG}")
-    endforeach()
+    endforeach ()
     string(STRIP "${CMAKE_CUDA_FLAGS}" CMAKE_CUDA_FLAGS)
     message(STATUS "CMAKE_CUDA_FLAGS: \"${CMAKE_CUDA_FLAGS}\"")
 
-    if(MSVC)
+    if (MSVC)
         set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} /O2 /Ob2")
-    else()
+    else ()
         set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3")
-    endif()
-elseif(NOT CUDA_FOUND)
+    endif ()
+elseif (NOT CUDA_FOUND)
     message(STATUS "CUDA not found, build for CPU-only.")
-else()
+else ()
     message(STATUS "CUDA found, but build for CPU-only on Windows.")
-endif()
+endif ()
 
 function(system)
     set(options STRIP)
@@ -121,9 +118,9 @@ function(system)
             "${ARGN}"
     )
 
-    if(NOT DEFINED SYSTEM_WORKING_DIRECTORY)
+    if (NOT DEFINED SYSTEM_WORKING_DIRECTORY)
         set(SYSTEM_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
-    endif()
+    endif ()
 
     execute_process(
             COMMAND ${SYSTEM_COMMAND}
@@ -132,32 +129,32 @@ function(system)
             WORKING_DIRECTORY "${SYSTEM_WORKING_DIRECTORY}"
     )
 
-    if("${SYSTEM_STRIP}")
+    if ("${SYSTEM_STRIP}")
         string(STRIP "${STDOUT}" STDOUT)
         string(STRIP "${STDERR}" STDERR)
-    endif()
+    endif ()
 
     set("${SYSTEM_OUTPUT_VARIABLE}" "${STDOUT}" PARENT_SCOPE)
 
-    if(DEFINED SYSTEM_ERROR_VARIABLE)
+    if (DEFINED SYSTEM_ERROR_VARIABLE)
         set("${SYSTEM_ERROR_VARIABLE}" "${STDERR}" PARENT_SCOPE)
-    endif()
+    endif ()
 endfunction()
 
-if(NOT DEFINED PYTHON_EXECUTABLE)
-    if(WIN32)
+if (NOT DEFINED PYTHON_EXECUTABLE)
+    if (WIN32)
         set(PYTHON_EXECUTABLE "python.exe")
-    else()
+    else ()
         set(PYTHON_EXECUTABLE "python")
-    endif()
-endif()
+    endif ()
+endif ()
 
-if(UNIX)
+if (UNIX)
     system(
             STRIP OUTPUT_VARIABLE PYTHON_EXECUTABLE
             COMMAND bash -c "type -P '${PYTHON_EXECUTABLE}'"
     )
-endif()
+endif ()
 
 system(
         STRIP OUTPUT_VARIABLE PYTHON_VERSION
@@ -167,20 +164,20 @@ system(
 message(STATUS "Use Python version: ${PYTHON_VERSION}")
 message(STATUS "Use Python executable: \"${PYTHON_EXECUTABLE}\"")
 
-if(NOT DEFINED PYTHON_INCLUDE_DIR)
+if (NOT DEFINED PYTHON_INCLUDE_DIR)
     message(STATUS "Auto detecting Python include directory...")
     system(
             STRIP OUTPUT_VARIABLE PYTHON_INCLUDE_DIR
             COMMAND "${PYTHON_EXECUTABLE}" -c "print(__import__('sysconfig').get_path('platinclude'))"
     )
-endif()
+endif ()
 
-if("${PYTHON_INCLUDE_DIR}" STREQUAL "")
+if ("${PYTHON_INCLUDE_DIR}" STREQUAL "")
     message(FATAL_ERROR "Python include directory not found")
-else()
+else ()
     message(STATUS "Detected Python include directory: \"${PYTHON_INCLUDE_DIR}\"")
     include_directories("${PYTHON_INCLUDE_DIR}")
-endif()
+endif ()
 
 system(
         STRIP OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
@@ -188,126 +185,85 @@ system(
 )
 message(STATUS "Detected Python site packages: \"${PYTHON_SITE_PACKAGES}\"")
 
-# Include pybind11
-set(PYBIND11_PYTHON_VERSION "${PYTHON_VERSION}")
-
-if(NOT DEFINED PYBIND11_CMAKE_DIR)
-    message(STATUS "Auto detecting pybind11 CMake directory...")
-    system(
-            STRIP OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
-            COMMAND "${PYTHON_EXECUTABLE}" -m pybind11 --cmakedir
-    )
-endif()
-
-if("${PYBIND11_CMAKE_DIR}" STREQUAL "")
-    FetchContent_Declare(
-            pybind11
-            GIT_REPOSITORY https://github.com/pybind/pybind11.git
-            GIT_TAG "${PYBIND11_VERSION}"
-            GIT_SHALLOW TRUE
-            SOURCE_DIR "${CMAKE_SOURCE_DIR}/third-party/pybind11"
-            BINARY_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/pybind11/build"
-            STAMP_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/pybind11/stamp"
-    )
-    FetchContent_GetProperties(pybind11)
-    if(NOT pybind11_POPULATED)
-        message(STATUS "Populating Git repository pybind11@${PYBIND11_VERSION} to third-party/pybind11...")
-        FetchContent_MakeAvailable(pybind11)
+find_package(Git REQUIRED)
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    message(STATUS "Populating Git submodule.")
+    execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                    RESULT_VARIABLE GIT_SUBMOD_RESULT)
+    if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+        message(FATAL_ERROR 
+                "git submodule updata --init --recursive failed with ${GIT_SUBMOD_RESULT}.")
     endif()
-else()
-    message(STATUS "Detected Pybind11 CMake directory: \"${PYBIND11_CMAKE_DIR}\"")
-    find_package(pybind11 CONFIG PATHS "${PYBIND11_CMAKE_DIR}")
 endif()
 
-if(NOT DEFINED TORCH_INCLUDE_PATH)
+if (NOT DEFINED TORCH_INCLUDE_PATH)
     message(STATUS "Auto detecting Torch include directory...")
     system(
             STRIP OUTPUT_VARIABLE TORCH_INCLUDE_PATH
             COMMAND "${PYTHON_EXECUTABLE}" -c "print('\\\;'.join(__import__('torch.utils.cpp_extension', fromlist=[None]).include_paths()))"
     )
 
-    if("${TORCH_INCLUDE_PATH}" STREQUAL "")
+    if ("${TORCH_INCLUDE_PATH}" STREQUAL "")
         set(TORCH_INCLUDE_PATH "${PYTHON_SITE_PACKAGES}/torch/include")
-    endif()
-endif()
+    endif ()
+endif ()
 
-if("${TORCH_INCLUDE_PATH}" STREQUAL "")
+if ("${TORCH_INCLUDE_PATH}" STREQUAL "")
     message(FATAL_ERROR "Torch include directory not found. Got: \"${TORCH_INCLUDE_PATH}\"")
-else()
+else ()
     message(STATUS "Detected Torch include directory: \"${TORCH_INCLUDE_PATH}\"")
     include_directories(${TORCH_INCLUDE_PATH})
-endif()
+endif ()
 
-if(NOT DEFINED TORCH_LIBRARY_PATH)
+if (NOT DEFINED TORCH_LIBRARY_PATH)
     message(STATUS "Auto detecting Torch library directory...")
     system(
             STRIP OUTPUT_VARIABLE TORCH_LIBRARY_PATH
             COMMAND "${PYTHON_EXECUTABLE}" -c "print('\\\;'.join(__import__('torch.utils.cpp_extension', fromlist=[None]).library_paths()))"
     )
 
-    if("${TORCH_LIBRARY_PATH}" STREQUAL "")
+    if ("${TORCH_LIBRARY_PATH}" STREQUAL "")
         set(TORCH_LIBRARY_PATH "${PYTHON_SITE_PACKAGES}/torch/lib")
-    endif()
-endif()
+    endif ()
+endif ()
 
-if("${TORCH_LIBRARY_PATH}" STREQUAL "")
+if ("${TORCH_LIBRARY_PATH}" STREQUAL "")
     message(FATAL_ERROR "Torch library directory not found. Got: \"${TORCH_LIBRARY_PATH}\"")
-else()
+else ()
     message(STATUS "Detected Torch library directory: \"${TORCH_LIBRARY_PATH}\"")
-endif()
+endif ()
 
 unset(TORCH_LIBRARIES)
 
-foreach(VAR_PATH ${TORCH_LIBRARY_PATH})
+foreach (VAR_PATH ${TORCH_LIBRARY_PATH})
     file(GLOB TORCH_LIBRARY "${VAR_PATH}/*")
     message(STATUS "Detected Torch libraries: \"${TORCH_LIBRARY}\"")
-endforeach()
+endforeach ()
 
-foreach(VAR_PATH ${TORCH_LIBRARY_PATH})
-    if(WIN32)
+foreach (VAR_PATH ${TORCH_LIBRARY_PATH})
+    if (WIN32)
         file(GLOB TORCH_LIBRARY "${VAR_PATH}/*.lib")
-    else()
+    else ()
         file(GLOB TORCH_LIBRARY "${VAR_PATH}/libtorch_python.*")
-    endif()
+    endif ()
     list(APPEND TORCH_LIBRARIES "${TORCH_LIBRARY}")
-endforeach()
+endforeach ()
 
 message(STATUS "Detected Torch Python libraries: \"${TORCH_LIBRARIES}\"")
 
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
-# Include CUTLASS
-FetchContent_Declare(
-        cutlass
-        GIT_REPOSITORY https://github.com/NVIDIA/cutlass.git
-        GIT_TAG "${CUTLASS_VERSION}"
-        GIT_SHALLOW TRUE
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/third-party/cutlass"
-        BINARY_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/cutlass/build"
-        STAMP_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/cutlass/stamp"
-)
-FetchContent_GetProperties(cutlass)
-if(NOT cutlass_POPULATED)
-    message(STATUS "Populating Git repository cutlass@${CUTLASS_VERSION} to third-party/cutlass...")
-    FetchContent_MakeAvailable(cutlass)
-endif()
-
-# Include fmt
-#FetchContent_Declare(
-#        fmt
-#        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-#        GIT_TAG "${FMT_VERSION}"
-#        GIT_SHALLOW TRUE
-#        SOURCE_DIR "${CMAKE_SOURCE_DIR}/third-party/fmt"
-#        BINARY_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/fmt/build"
-#        STAMP_DIR "${CMAKE_SOURCE_DIR}/third-party/.cmake/fmt/stamp"
-#)
-#FetchContent_GetProperties(fmt)
-#if(NOT fmt_POPULATED)
-#    message(STATUS "Populating Git repository fmt@${FMT_VERSION} to third-party/fmt...")
-#    FetchContent_MakeAvailable(fmt)
-#endif()
+set(_saved_CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL})
+set(CMAKE_MESSAGE_LOG_LEVEL ERROR)
+add_subdirectory(third-party/cutlass)
+add_subdirectory(third-party/pybind11)
+add_subdirectory(third-party/googletest)
+set(CMAKE_MESSAGE_LOG_LEVEL ${_saved_CMAKE_MESSAGE_LOG_LEVEL})
 
 include_directories("${CMAKE_SOURCE_DIR}")
 include_directories(include)
 add_subdirectory(src)
+if(BUILD_QUIK_UNIT_TEST)
+    add_subdirectory(test/unit)
+endif()

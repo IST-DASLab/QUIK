@@ -6,7 +6,7 @@ endif ()
 
 
 add_library(_C_LIBRARY_MATMUL STATIC "${SRCS}")
-target_link_libraries(_C_LIBRARY_MATMUL PRIVATE ${TORCH_LIBRARIES})
+target_link_libraries(_C_LIBRARY_MATMUL PRIVATE ${TORCH_LIBRARIES} cusparseLt)
 if (CUDA_FOUND)
     target_link_libraries(_C_LIBRARY_MATMUL PRIVATE nvidia::cutlass::cutlass nvidia::cutlass::tools::util)
 endif ()

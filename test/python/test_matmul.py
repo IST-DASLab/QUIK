@@ -32,9 +32,9 @@ def int4_spmm_test():
     M, K, N = 256, 512, 128
     assert K % 16 == 0
     a = torch.randint(-3, 3, (M, K // 2), dtype=torch.int32).cuda()
-    metadata = quik.matmul.genRandomSparseMeta(M, K)
+    metadata = quik.matmul.int4GenRandomSparseMeta(M, K)
 
-    rmeta = quik.matmul.reorderMeta(metadata)
+    rmeta = quik.matmul.int4ReorderMeta(metadata)
 
     e = rmeta.cuda()
 
@@ -44,8 +44,30 @@ def int4_spmm_test():
     qb = pack_to_i4(b)
     c = quik.matmul.int4SpMatmul(qa, qb, e)
 
-    qa_uncompressed = quik.matmul.uncompress(qa.cpu(), metadata, M, K)
+    qa_uncompressed = quik.matmul.int4Uncompress(qa.cpu(), metadata, M, K)
     c_ref = quik.matmul.int4Matmul(qa_uncompressed.cuda(), qb)
+
+    assert torch.equal(c, c_ref)
+
+
+def int8_spmm_test():
+    torch.manual_seed(1)
+    np.random.seed(1)
+    M, K, N = 256, 512, 128
+    assert K % 16 == 0
+    qa = torch.randint(-5, 5, (M, K // 2), dtype=torch.int8).cuda()
+    metadata = quik.matmul.int8GenRandomSparseMeta(M, K)
+
+    rmeta = quik.matmul.int8ReorderMeta(metadata)
+
+    e = rmeta.cuda()
+
+    qb = torch.randint(-5, 5, (N, K), dtype=torch.int8).cuda()
+
+    c = quik.matmul.int8SpMatmul(qa, qb, e)
+
+    qa_uncompressed = quik.matmul.int8Uncompress(qa.cpu(), metadata, M, K)
+    c_ref = quik.matmul.int8Matmul(qa_uncompressed.cuda(), qb)
 
     assert torch.equal(c, c_ref)
 
@@ -53,3 +75,4 @@ def int4_spmm_test():
 if __name__ == '__main__':
     int4_kernel_test()
     int4_spmm_test()
+    int8_spmm_test()

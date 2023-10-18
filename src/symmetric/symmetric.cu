@@ -3,7 +3,7 @@
 #include "util.h"
 
 namespace QUIK::symmetric {
-__global__ void quantizeCUDAKernel(Int4Storage *__restrict__ dst,
+__global__ void int4QuantizationCUDAKernel(Int4Storage *__restrict__ dst,
                                        const torch::Half *__restrict__ scale,
                                        const torch::Half *__restrict__ src,
                                        const unsigned rows,
@@ -29,8 +29,8 @@ __global__ void quantizeCUDAKernel(Int4Storage *__restrict__ dst,
   dst[colDst + row * colsDst] = storage;
 }
 
-torch::Tensor quantizeCUDA(const torch::Tensor &src,
-                               const torch::Tensor &scale) {
+torch::Tensor int4QuantizationCUDA(const torch::Tensor &src,
+                                   const torch::Tensor &scale) {
   torch::checkSameGPU("quantize", {src, "src", 0}, {scale, "scale", 1});
   torch::checkSize("quantize", torch::TensorArg{scale, "scale", 1}, 0,
                    src.size(0));
@@ -43,14 +43,56 @@ torch::Tensor quantizeCUDA(const torch::Tensor &src,
                        .device(src.device()));
   dim3 block{std::min<unsigned>(colsDst, 32), std::min<unsigned>(rows, 16)};
   dim3 grid{(colsDst - 1) / block.x + 1, (rows - 1) / block.y + 1};
-  quantizeCUDAKernel<<<grid, block>>>(
+  int4QuantizationCUDAKernel<<<grid, block>>>(
       dst.data_ptr<Int4Storage>(), scale.data_ptr<torch::Half>(),
       src.data_ptr<torch::Half>(), rows, colsSrc, colsDst);
   return dst;
 }
 
+__global__ void int8QuantizationCUDAKernel(
+    int8_t *__restrict__ dst, const torch::Half *__restrict__ scale,
+    const torch::Half *__restrict__ src, const unsigned rows,
+    const unsigned cols) {
+  const unsigned row = threadIdx.y + blockIdx.y * blockDim.y;
+  const unsigned col = threadIdx.x + blockIdx.x * blockDim.x;
+  if (row >= rows || col >= cols) {
+    return;
+  }
+  const unsigned id = col + row * cols;
+  dst[id] = __half2int_rn(__hdiv(src[id], scale[row]));
+}
+
+torch::Tensor int8QuantizationCUDA(const torch::Tensor &src,
+                                   const torch::Tensor &scale) {
+  torch::checkSameGPU("quantize", {src, "src", 0}, {scale, "scale", 1});
+  torch::checkSize("quantize", torch::TensorArg{scale, "scale", 1}, 0,
+                   src.size(0));
+  unsigned rows = src.size(0);
+  unsigned cols = src.size(1);
+  auto dst = torch::empty(
+      {rows, cols}, torch::dtype(util::TorchDtypeDispatcher<int8_t>::value)
+                        .device(src.device()));
+  dim3 block{std::min<unsigned>(cols, 32), std::min<unsigned>(rows, 16)};
+  dim3 grid{(cols - 1) / block.x + 1, (rows - 1) / block.y + 1};
+  int8QuantizationCUDAKernel<<<grid, block>>>(
+      dst.data_ptr<int8_t>(), scale.data_ptr<torch::Half>(),
+      src.data_ptr<torch::Half>(), rows, cols);
+  return dst;
+}
+
+template <typename T>
+__device__ __half convertToHalf(T value) {
+  return __int2half_rn(static_cast<int>(value));
+}
+
+template <>
+__device__ __half convertToHalf(torch::Half value) {
+  return (__half)value;
+}
+
+template <typename T>
 __global__ void dequantizationKernel(torch::Half *__restrict__ out,
-                                     const int *__restrict__ x,
+                                     const T *__restrict__ x,
                                      const torch::Half *__restrict__ scaleRow,
                                      const torch::Half *__restrict__ scaleCol,
                                      const torch::Half *__restrict__ y,
@@ -65,36 +107,48 @@ __global__ void dequantizationKernel(torch::Half *__restrict__ out,
     return;
   }
 
-  __half xElement = __int2half_rn(x[col + row * cols]);
+  __half xElement = convertToHalf<T>(x[col + row * cols]);
 
-  out[col + row * cols] = __hfma(__hmul(xElement, scaleRow[row]), scaleCol[col],
-                                 y[col + row * cols]);
+  out[col + row * cols] = __hmul(__hmul(xElement, scaleRow[row]), scaleCol[col]) + 
+                          y[col + row * cols];
 }
 
-torch::Tensor dequantizeCUDA(const torch::Tensor &x,
+template <typename T>
+torch::Tensor dequantizationCUDA(const torch::Tensor &x,
                                  const torch::Tensor &scaleRow,
                                  const torch::Tensor &scaleCol,
                                  const torch::Tensor &y) {
   torch::checkAllSameGPU("dequantize", {{x, "x", 0},
-                                          {scaleRow, "scaleRow", 1},
-                                          {scaleCol, "scaleCol", 2},
-                                          {y, "y", 3}});
-//  torch::checkSameNumel("dequantize", torch::TensorArg{x, "x", 0}, torch::TensorArg{y, "y", 1});
+                                              {scaleRow, "scaleRow", 1},
+                                              {scaleCol, "scaleCol", 2},
+                                              {y, "y", 3}});
+  torch::checkSameSize("dequantize", {x, "x", 0}, {y, "y", 1});
   unsigned rows = x.size(0);
   unsigned cols = x.size(1);
   torch::checkSize("dequantize", torch::TensorArg{scaleRow, "scaleRow", 1},
                    0, rows);
-  torch::checkSize("dequantize", torch::TensorArg{scaleCol, "scaleCol", 2}, 0,
-                   cols);
+  torch::checkSize("dequantize", torch::TensorArg{scaleCol, "scaleCol", 2},
+                   1, cols);
   auto out = torch::empty_like(y);
   dim3 block{std::min<unsigned>(cols, 16),
              std::min<unsigned>((rows - 1) + 1, 16)};
   dim3 grid{(cols - 1) / block.x + 1, (rows - 1) / block.y + 1};
   dequantizationKernel<<<grid, block>>>(
-      out.data_ptr<torch::Half>(), x.data_ptr<int>(),
+      out.data_ptr<torch::Half>(), x.data_ptr<T>(),
       scaleRow.data_ptr<torch::Half>(), scaleCol.data_ptr<torch::Half>(),
       y.data_ptr<torch::Half>(), rows, cols);
   return out;
 }
-
+template torch::Tensor dequantizationCUDA<int8_t>(const torch::Tensor &x,
+                                                 const torch::Tensor &scaleRow,
+                                                 const torch::Tensor &scaleCol,
+                                                 const torch::Tensor &y);
+template torch::Tensor dequantizationCUDA<int>(const torch::Tensor &x,
+                                               const torch::Tensor &scaleRow,
+                                               const torch::Tensor &scaleCol,
+                                               const torch::Tensor &y);
+template torch::Tensor dequantizationCUDA<torch::Half>(const torch::Tensor &x,
+                                                       const torch::Tensor &scaleRow,
+                                                       const torch::Tensor &scaleCol,
+                                                       const torch::Tensor &y);
 }  // namespace QUIK::symmetric

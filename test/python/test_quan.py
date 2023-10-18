@@ -1,7 +1,7 @@
-import quik
 import torch
 import unittest
 
+import quik
 
 NUM_ROWS = 4096
 NUM_COLS = 11088
@@ -37,6 +37,7 @@ class TestQuan(unittest.TestCase):
             self.assertAlmostEqual(torch.max(torch.abs(meta - meta_base)).item(), 0.0, 3, f"Wrong meta")
             self.assertAlmostEqual(torch.max(torch.abs(fp_t - fp_t_base)).item(), 0.0, 3, f"Wrong full precision")
             self.assertAlmostEqual(torch.max(torch.abs(q - q_base)).item(), 0.0, 3, f"Wrong quantized")
+
 
 if __name__ == '__main__':
     unittest.main()
