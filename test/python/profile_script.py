@@ -22,7 +22,8 @@ def timer(func):
     return start_event.elapsed_time(end_event)
 
 
-def profiler(shape_list, profile_type_list, we_dont_need_quant, repetitions=300, preheats=5):
+def profiler(shape_list, profile_type_list, dont_need_quant_and_dequant, dont_need_dequant, repetitions=300,
+             preheats=5):
     for instance in profile_type_list:
         quant_time_per_type_s = []
         matmul_time_per_type_s = []
@@ -58,8 +59,11 @@ def profiler(shape_list, profile_type_list, we_dont_need_quant, repetitions=300,
                     multiple_time_matmul_ms += single_time_matmul_ms
                     multiple_time_dequant_ms += single_time_dequant_ms
 
-                if (instance in we_dont_need_quant):
+                if (instance in dont_need_quant_and_dequant):
                     multiple_time_quant_ms = 0.0
+                    multiple_time_dequant_ms = 0.0
+
+                if (instance in dont_need_dequant):
                     multiple_time_dequant_ms = 0.0
 
             instance.cleaning()
@@ -113,20 +117,23 @@ shape_list = [256, 512] + \
              [x * 1024 for x in range(1, 15)]
 
 profile_type_list = [
-    # samples.Int4MatmulInt32Out,
-    # samples.Int4SpMatmulInt32Out,
+    samples.Int4MatmulInt32Out,
+    samples.Int4SpMatmulInt32Out,
     samples.Int8MatmulInt32Out,
-    # samples.Int8SpMatmulInt32Out,
-    # samples.FP16Matmul,
-    # samples.FP32Matmul,
+    samples.Int8SpMatmulInt32Out,
+    samples.FP16Matmul,
+    samples.FP32Matmul,
     # samples.Int8SpmmCuspLtFp16Out,
-    # samples.Int4FusionFp16Out,
+    samples.Int4FusionFp16Out,
     samples.Int8FusionFp16Out,
 ]
 
-we_dont_need_quant = [
+dont_need_quant_and_dequant = [
     samples.FP16Matmul,
     samples.FP32Matmul,
+]
+
+dont_need_dequant = [
     samples.Int4FusionFp16Out,
     samples.Int8FusionFp16Out,
 ]
@@ -147,6 +154,7 @@ if __name__ == "__main__":
     repetitions = 300
     preheats = 10
     profiler(shape_list, profile_type_list,
-             we_dont_need_quant, repetitions=repetitions, preheats=preheats)
+             dont_need_quant_and_dequant,
+             dont_need_dequant, repetitions=repetitions, preheats=preheats)
 
-    writer(written_data_dict, path=written_data_directory)
+    # writer(written_data_dict, path=written_data_directory)

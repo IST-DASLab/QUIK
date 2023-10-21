@@ -1,6 +1,10 @@
 #pragma once
-#include <cusparseLt.h>
+
 #include <torch/extension.h>
+
+#ifdef QUIK_WITH_CUSPARSELT
+#include <cusparseLt.h>
+#endif
 
 namespace QUIK::matmul {
 torch::Tensor int4MatmulCUDA(const torch::Tensor &A, const torch::Tensor &B);
@@ -41,31 +45,7 @@ torch::Tensor int8GenRandomSparseMeta(int M, int K);
 torch::Tensor int8Uncompress(const torch::Tensor &A, const torch::Tensor &E,
                              int M, int K);
 
-torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
-                                      const torch::Tensor &B,
-                                      const torch::Tensor &scale_row,
-                                      const torch::Tensor &scale_col,
-                                      const torch::Tensor &y);
-
-torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
-                                      const torch::Tensor &B,
-                                      const torch::Tensor &scale_row,
-                                      const torch::Tensor &scale_col,
-                                      const torch::Tensor &y);
-
-torch::Tensor int4SpFusedDequantizeCUDA(const torch::Tensor &A,
-                                        const torch::Tensor &B,
-                                        const torch::Tensor &E,
-                                        const torch::Tensor &scale_row,
-                                        const torch::Tensor &scale_col,
-                                        const torch::Tensor &y);
-
-torch::Tensor int8SpFusedDequantizeCUDA(const torch::Tensor &A,
-                                        const torch::Tensor &B,
-                                        const torch::Tensor &E,
-                                        const torch::Tensor &scale_row,
-                                        const torch::Tensor &scale_col,
-                                        const torch::Tensor &y);
+#ifdef QUIK_WITH_CUSPARSELT
 
 class CusparseLtInt8SpMatmul {
  private:
@@ -102,4 +82,5 @@ class CusparseLtInt8SpMatmul {
   torch::Tensor matmulDefault();
 };
 
+#endif
 }  // namespace QUIK::matmul

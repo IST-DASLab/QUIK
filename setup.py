@@ -7,6 +7,7 @@ import sys
 import sysconfig
 
 from setuptools import setup
+import subprocess
 
 try:
     from pybind11.setup_helpers import Pybind11Extension as Extension
@@ -84,9 +85,17 @@ class cmake_build_ext(build_ext):
 
         try:
             os.chdir(build_temp)
-            self.spawn([cmake, ext.source_dir, *cmake_args])
+            
+            retcode = subprocess.call([cmake, ext.source_dir, *cmake_args])
+            if retcode != 0:
+                sys.stderr.write("Error: CMake configuration failed.\n")
+                sys.exit(1)
+            
             if not self.dry_run:
-                self.spawn([cmake, '--build', '.', *build_args])
+                retcode = subprocess.call([cmake, '--build', '.', *build_args])
+                if retcode != 0:
+                    sys.stderr.write("Error: Building with CMake failed.\n")
+                    sys.exit(1)
         finally:
             os.chdir(HERE)
 

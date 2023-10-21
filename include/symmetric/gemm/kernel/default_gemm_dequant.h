@@ -32,13 +32,14 @@
 #pragma once
 
 #include "cutlass/gemm/kernel/default_gemm.h"
-#include "fused_dequantize/default_epilogue_tensor_op_dequant.h"
-#include "fused_dequantize/kernel/gemm_dequant.h"
+#include "symmetric/epilogue/threadblock/default_epilogue_tensor_op_dequant.h"
+#include "symmetric/gemm/kernel/gemm_dequant.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {
 namespace gemm {
 namespace kernel {
+namespace symmetric {
 
 template <
     /// Element type for A matrix operand
@@ -117,17 +118,19 @@ struct DefaultGemmDequant
                   SharedMemoryClear, GatherA, GatherB, ScatterD, PermuteDLayout,
                   PermuteALayout, PermuteBLayout>;
 
-  using Epilogue =
-      typename cutlass::epilogue::threadblock::DefaultEpilogueTensorOpDequant<
+  using Epilogue = typename cutlass::epilogue::threadblock::symmetric::
+      DefaultEpilogueTensorOpDequant<
           ThreadblockShape, typename DefaultGemm::Mma::Operator,
           DefaultGemm::kPartitionsK, EpilogueOutputOp, EpilogueOutputOp::kCount,
           ScatterD, PermuteDLayout>::Epilogue;
 
-  using GemmKernel = kernel::GemmDequant<typename DefaultGemm::Mma, Epilogue,
-                                         ThreadblockSwizzle, SplitKSerial>;
+  using GemmKernel =
+      kernel::symmetric::GemmDequant<typename DefaultGemm::Mma, Epilogue,
+                                     ThreadblockSwizzle, SplitKSerial>;
 };
 ////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace symmetric
 }  // namespace kernel
 }  // namespace gemm
 }  // namespace cutlass

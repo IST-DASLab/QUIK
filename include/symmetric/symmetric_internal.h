@@ -25,4 +25,31 @@ extern template torch::Tensor dequantizationCUDA<torch::Half>(
 extern template torch::Tensor dequantizationCUDA<int>(
     const torch::Tensor &x, const torch::Tensor &scaleRow,
     const torch::Tensor &scaleCol, const torch::Tensor &y);
+
+torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
+                                      const torch::Tensor &B,
+                                      const torch::Tensor &scale_row,
+                                      const torch::Tensor &scale_col,
+                                      const torch::Tensor &y);
+
+torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
+                                      const torch::Tensor &B,
+                                      const torch::Tensor &scale_row,
+                                      const torch::Tensor &scale_col,
+                                      const torch::Tensor &y);
+
+torch::Tensor int4SpFusedDequantizeCUDA(const torch::Tensor &A,
+                                        const torch::Tensor &B,
+                                        const torch::Tensor &E,
+                                        const torch::Tensor &scale_row,
+                                        const torch::Tensor &scale_col,
+                                        const torch::Tensor &y);
+
+torch::Tensor int8SpFusedDequantizeCUDA(const torch::Tensor &A,
+                                        const torch::Tensor &B,
+                                        const torch::Tensor &E,
+                                        const torch::Tensor &scale_row,
+                                        const torch::Tensor &scale_col,
+                                        const torch::Tensor &y);
+
 }  // namespace QUIK::symmetric

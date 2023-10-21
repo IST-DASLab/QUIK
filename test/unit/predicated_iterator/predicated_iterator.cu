@@ -40,9 +40,9 @@
 #include "cutlass/util/host_tensor.h"
 #include "cutlass/util/reference/host/tensor_fill.h"
 #include "cutlass/util/tensor_view_io.h"
-#include "fused_dequantize/linear_combination_dequant.h"
-#include "fused_dequantize/predicated_vcol_iterator.h"
-#include "fused_dequantize/predicated_vrow_iterator.h"
+#include "symmetric/epilogue/thread/linear_combination_dequant.h"
+#include "symmetric/epilogue/threadblock/predicated_vcol_iterator.h"
+#include "symmetric/epilogue/threadblock/predicated_vrow_iterator.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace test {
@@ -185,12 +185,12 @@ TEST(PredicatedIterator, tensor_op_128x256x64_64x64x64) {
                                                              Element>;
 
   using RowVecIterator =
-      cutlass::epilogue::threadblock::PredicatedVRowIterator<SourceThreadMap,
-                                                             Element>;
+      cutlass::epilogue::threadblock::symmetric::PredicatedVRowIterator<
+          SourceThreadMap, Element>;
 
   using ColVecIterator =
-      cutlass::epilogue::threadblock::PredicatedVColIterator<SourceThreadMap,
-                                                             Element>;
+      cutlass::epilogue::threadblock::symmetric::PredicatedVColIterator<
+          SourceThreadMap, Element>;
 
   cutlass::MatrixCoord source_extent{rows, cols};
   cutlass::MatrixCoord row_vec_extent{1, cols};

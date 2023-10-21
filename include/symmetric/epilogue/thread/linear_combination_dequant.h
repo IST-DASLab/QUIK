@@ -49,17 +49,18 @@
 namespace cutlass {
 namespace epilogue {
 namespace thread {
+namespace symmetric {
 
 struct MyScaleType {
   enum Kind {
-    RowAndColScaling,
+    Dequantize,
   };
 };
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename ElementOutput_, int Count, typename ElementAccumulator_,
           typename ElementCompute_ = cutlass::half_t,
-          MyScaleType::Kind Scale = MyScaleType::RowAndColScaling,
+          MyScaleType::Kind Scale = MyScaleType::Dequantize,
           FloatRoundStyle Round = FloatRoundStyle::round_to_nearest,
           typename ElementSource_ = cutlass::half_t>
 class LinearCombinationDequant {
@@ -72,7 +73,7 @@ class LinearCombinationDequant {
   using ElementD = ElementOutput_;
 
   static int const kCount = Count;
-  static const MyScaleType::Kind kScale = MyScaleType::RowAndColScaling;
+  static const MyScaleType::Kind kScale = MyScaleType::Dequantize;
 
   using FragmentOutput = Array<ElementOutput, kCount>;
   using FragmentSource = Array<ElementSource, kCount>;
@@ -82,14 +83,13 @@ class LinearCombinationDequant {
   static FloatRoundStyle const kRound = Round;
 
   struct Params {
-    ElementCompute const *beta_ptr;
     ElementCompute beta;
 
     CUTLASS_HOST_DEVICE
-    Params() : beta_ptr(nullptr), beta(ElementCompute(0)) {}
+    Params() : beta(ElementCompute(0)) {}
 
     CUTLASS_HOST_DEVICE
-    Params(ElementCompute beta) : beta_ptr(nullptr), beta(beta) {}
+    Params(ElementCompute beta) : beta(beta) {}
   };
 
  private:
@@ -97,26 +97,16 @@ class LinearCombinationDequant {
   // Data members
   //
 
-  ElementCompute const *beta_ptr_ = nullptr;
   ElementCompute beta_ = ElementCompute(0);
 
  public:
   /// Constructs the function object
   CUTLASS_HOST_DEVICE
-  LinearCombinationDequant(Params const &params) {
-    if (params.beta_ptr) {
-      beta_ptr_ = params.beta_ptr;
-    } else {
-      beta_ = params.beta;
-    }
-  }
+  LinearCombinationDequant(Params const &params) { beta_ = params.beta; }
 
   /// Returns true if source is needed
   CUTLASS_HOST_DEVICE
   bool is_source_needed() const { return true; }
-
-  CUTLASS_HOST_DEVICE
-  bool is_beta_vector() const { return beta_ptr_ != nullptr; }
 
   CUTLASS_HOST_DEVICE
   void set_k_partition(int k_partition, int k_partition_count) {
@@ -170,6 +160,7 @@ class LinearCombinationDequant {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace symmetric
 }  // namespace thread
 }  // namespace epilogue
 }  // namespace cutlass

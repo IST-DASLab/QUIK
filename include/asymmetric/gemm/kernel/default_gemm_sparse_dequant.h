@@ -31,15 +31,16 @@
  **************************************************************************************************/
 #pragma once
 
+#include "asymmetric/epilogue/threadblock/default_epilogue_tensor_op_dequant.h"
+#include "asymmetric/gemm/kernel/sparse_gemm_dequant.h"
 #include "cutlass/gemm/kernel/default_gemm_sparse.h"
-#include "fused_dequantize/default_epilogue_tensor_op_dequant.h"
-#include "fused_dequantize/kernel/sparse_gemm_dequant.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {
 namespace gemm {
 namespace kernel {
+namespace asymmetric {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -96,20 +97,22 @@ struct DefaultSparseGemmDequant
       arch::Sm80, ThreadblockShape, WarpShape, InstructionShape,
       EpilogueOutputOp, ThreadblockSwizzle, Stages, SplitKSerial, Operator>;
 
-  using Epilogue =
-      typename cutlass::epilogue::threadblock::DefaultEpilogueTensorOpDequant<
+  using Epilogue = typename cutlass::epilogue::threadblock::asymmetric::
+      DefaultEpilogueTensorOpDequant<
           ThreadblockShape, typename DefaultSparseGemm::Mma::Operator,
           DefaultSparseGemm::kPartitionsK, EpilogueOutputOp,
           EpilogueOutputOp::kCount>::Epilogue;
 
   /// Define the kernel-level GEMM operator.
   using GemmKernel =
-      kernel::SparseGemmDequant<typename DefaultSparseGemm::Mma, Epilogue,
-                                ThreadblockSwizzle, SplitKSerial>;
+      kernel::asymmetric::SparseGemmDequant<typename DefaultSparseGemm::Mma,
+                                            Epilogue, ThreadblockSwizzle,
+                                            SplitKSerial>;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace asymmetric
 }  // namespace kernel
 }  // namespace gemm
 }  // namespace cutlass

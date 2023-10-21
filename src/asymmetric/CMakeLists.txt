@@ -1,7 +1,7 @@
 set(SRCS asymmetric.cpp)
 
 if (CUDA_FOUND)
-    list(APPEND SRCS asymmetric.cu)
+    list(APPEND SRCS asymmetric.cu fused_dequantize.cu)
 endif ()
 
 
