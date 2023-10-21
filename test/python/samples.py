@@ -113,6 +113,21 @@ class Int4MatmulInt32Out(Kernel):
         cls._c = quik.matmul.int4Matmul(cls._a, cls._b)
 
 
+class Int4FusionFp16Out(Int4MatmulInt32Out):
+    @classmethod
+    def calculation(cls):
+        cls._c = quik.matmul.int4FusedDequantize(cls._a, cls._b, cls._scale_row, cls._scale_col, cls._y)
+
+    @classmethod
+    def matmul_randomizer(cls):
+        super().matmul_randomizer()
+        cls._c_ref = cls._c_ref * cls._scale_row * cls._scale_col + cls._y
+
+    @classmethod
+    def dequantization(cls):
+        pass
+
+
 class Int4SpMatmulInt32Out(Kernel):
     @classmethod
     def __init__(cls, M, N, K):
@@ -219,6 +234,21 @@ class Int8SpMatmulInt32Out(Kernel):
     def cleaning(cls):
         super().cleaning()
         del cls._e
+
+
+class Int8FusionFp16Out(Int8MatmulInt32Out):
+    @classmethod
+    def calculation(cls):
+        cls._c = quik.matmul.int8FusedDequantize(cls._a, cls._b, cls._scale_row, cls._scale_col, cls._y)
+
+    @classmethod
+    def matmul_randomizer(cls):
+        super().matmul_randomizer()
+        cls._c_ref = cls._c_ref * cls._scale_row * cls._scale_col + cls._y
+
+    @classmethod
+    def dequantization(cls):
+        pass
 
 
 class Int8SpmmCuspLtFp16Out(Kernel):

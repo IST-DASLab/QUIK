@@ -1,21 +1,29 @@
-function(add_unit_test executable)
-    file(GLOB_RECURSE srcs CONFIGURE_DEPENDS 
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp 
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.cc 
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.cu
-        )
-    add_executable(${executable}
-        ${srcs}
-        )
-    target_include_directories(${executable} SYSTEM PRIVATE
-        ${PROJECT_SOURCE_DIR}/third-party/googletest/googletest/include
-        ${CUDA_INCLUDE_DIRS}
-        )
-    target_link_libraries(${executable} PRIVATE
-        ${_C_LIBRARIES}
-        GTest::gtest_main
-        )
-endfunction()
+set(TEST_UNITS "")
+macro(add_qgpt_unit_test)
+    file(GLOB_RECURSE srcs CONFIGURE_DEPENDS
+            ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/*.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/*.cu
+    )
+    list(APPEND TEST_UNITS ${srcs})
+    set(TEST_UNITS "${TEST_UNITS}" PARENT_SCOPE)
+endmacro()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
-add_subdirectory(test)
+add_subdirectory(linear_combination)
+add_subdirectory(predicated_iterator)
+add_subdirectory(gemm)
+
+
+add_executable(executable run_test.cpp
+        ${TEST_UNITS}
+)
+target_include_directories(executable SYSTEM PRIVATE
+        ${CUDA_INCLUDE_DIRS}
+        ${PROJECT_SOURCE_DIR}/third-party/googletest/googletest/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/common
+)
+target_link_libraries(executable PRIVATE
+        GTest::gtest_main
+        nvidia::cutlass::cutlass
+        nvidia::cutlass::tools::util
+)

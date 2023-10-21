@@ -6,7 +6,7 @@
 
 namespace QUIK::asymmetric {
 torch::Tensor quantizeOld(const torch::Tensor &src, const torch::Tensor &meta,
-                       int bits) {
+                          int bits) {
   torch::checkAllContiguous("quantize", {{src, "src", 0}, {meta, "meta", 1}});
   TORCH_CHECK(bits == 4 or bits == 8, "bits argument must be either 4 or 8");
   torch::checkDeviceType("quantize", {src, meta}, at::DeviceType::CUDA);
@@ -55,19 +55,20 @@ void buildSubmodule(py::module &mod) {
         "meta.scale - 2^{bits - 1}))",
         py::arg("src"), py::arg("meta"), py::arg("bits"));
 
-  m.def("quantize", &quantize,
-        "input: (src: torch.Tensor(M x N, FP16, CUDA),\n"
-        "int_indices: (torch.Tensor(NUM_INTs x 1, LONG, CUDA)),\n"
-        "fp_indices: (torch.Tensor(NUM_FPs x 1, LONG, CUDA)),\n"
-        "bits: int 4 or 8 \n"
-        "output: tuple: dst: torch.Tensor(M x ceil(N * bits / 8), UINT8, CUDA)\n"
-        "meta: torch.Tensor(2M x 1, FP16, CUDA)\n"
-        "fp_x: torch.Tensor(M x NUM_FPs, FP16, CUDA)\n"
-        "dst = int{bits}Packing(int{bits}Rounding((source - meta.zero) / "
-        "meta.scale - 2^{bits - 1}))",
-        "meta: M * [scale, zero]",
-        "meta: full precision features",
-        py::arg("src"), py::arg("int_indices"), py::arg("fp_indices"), py::arg("bits"));
+  m.def(
+      "quantize", &quantize,
+      "input: (src: torch.Tensor(M x N, FP16, CUDA),\n"
+      "int_indices: (torch.Tensor(NUM_INTs x 1, LONG, CUDA)),\n"
+      "fp_indices: (torch.Tensor(NUM_FPs x 1, LONG, CUDA)),\n"
+      "bits: int 4 or 8 \n"
+      "output: tuple: dst: torch.Tensor(M x ceil(N * bits / 8), UINT8, CUDA)\n"
+      "meta: torch.Tensor(2M x 1, FP16, CUDA)\n"
+      "fp_x: torch.Tensor(M x NUM_FPs, FP16, CUDA)\n"
+      "dst = int{bits}Packing(int{bits}Rounding((source - meta.zero) / "
+      "meta.scale - 2^{bits - 1}))",
+      "meta: M * [scale, zero]", "meta: full precision features",
+      py::arg("src"), py::arg("int_indices"), py::arg("fp_indices"),
+      py::arg("bits"));
 
   m.def("dequantize", &dequantize,
         "input (x: torch.Tensor(M x N, INT32),\n"

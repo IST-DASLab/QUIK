@@ -1,3 +1,4 @@
+.vscode/
 .idea
 cmake-build-*
 build
@@ -11,6 +12,7 @@ build
 *.DS_Store
 *.sbatch
 # Distribution / packaging
+__pycache__/
 .Python
 build/
 develop-eggs/

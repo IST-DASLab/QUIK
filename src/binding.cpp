@@ -1,8 +1,8 @@
 #include <pybind11/pybind11.h>
 
+#include "asymmetric/asymmetric.h"
 #include "matmul/matmul.h"
 #include "symmetric/symmetric.h"
-#include "asymmetric/asymmetric.h"
 
 PYBIND11_MODULE(_C, mod) {
   QUIK::matmul::buildSubmodule(mod);

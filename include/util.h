@@ -24,6 +24,11 @@ struct TorchDtypeDispatcher<int32_t> {
   constexpr static const auto value = torch::kInt32;
 };
 
+template <>
+struct TorchDtypeDispatcher<cutlass::half_t> {
+  constexpr static const auto value = torch::kFloat16;
+};
+
 template <typename T>
 struct DtypeTorchDispatcher;
 

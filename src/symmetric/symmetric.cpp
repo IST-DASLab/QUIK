@@ -6,13 +6,11 @@
 
 namespace QUIK::symmetric {
 
-torch::Tensor quantize(const torch::Tensor &src,
-                       const torch::Tensor &scale,
-                       const int bits){
-  torch::checkAllContiguous("quantize",
-                            {{src, "src", 0}, {scale, "scale", 1}});
+torch::Tensor quantize(const torch::Tensor &src, const torch::Tensor &scale,
+                       const int bits) {
+  torch::checkAllContiguous("quantize", {{src, "src", 0}, {scale, "scale", 1}});
   torch::checkDeviceType("quantize", {src, scale}, at::DeviceType::CUDA);
-  switch(bits){
+  switch (bits) {
     case 4:
       return int4QuantizationCUDA(src, scale);
     case 8:
@@ -22,19 +20,16 @@ torch::Tensor quantize(const torch::Tensor &src,
   }
 }
 
-
-torch::Tensor dequantize(const torch::Tensor &x,
-                         const torch::Tensor &scaleRow,
-                         const torch::Tensor &scaleCol,
-                         const torch::Tensor &y,
+torch::Tensor dequantize(const torch::Tensor &x, const torch::Tensor &scaleRow,
+                         const torch::Tensor &scaleCol, const torch::Tensor &y,
                          const int bits) {
   torch::checkAllContiguous("dequantize", {{x, "x", 0},
                                            {scaleRow, "scaleRow", 1},
                                            {scaleCol, "scaleCol", 2},
                                            {y, "y", 3}});
   torch::checkDeviceType("dequantize", {x, scaleRow, scaleCol, y},
-                                       at::DeviceType::CUDA);
-  switch(bits){
+                         at::DeviceType::CUDA);
+  switch (bits) {
     case 8:
       return dequantizationCUDA<int8_t>(x, scaleRow, scaleCol, y);
     case 16:
@@ -73,6 +68,7 @@ void buildSubmodule(py::module &mod) {
         "input x type is FP16\n"
         "when bits equal 32: "
         "input x type is int32\n",
-        py::arg("x"), py::arg("scale_row"), py::arg("scale_col"), py::arg("y"), py::arg("bits"));
+        py::arg("x"), py::arg("scale_row"), py::arg("scale_col"), py::arg("y"),
+        py::arg("bits"));
 }
 }  // namespace QUIK::symmetric
