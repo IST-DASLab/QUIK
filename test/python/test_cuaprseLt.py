@@ -10,24 +10,24 @@ def cusparseLt_test():
     ### Quantiza randomizer
     torch.manual_seed(1)
     np.random.seed(1)
-    src = torch.randn(M, K // 2, dtype=torch.float16).cuda()
-    scale = torch.randn(M, 1, dtype=torch.float16).cuda()
+    src = torch.randn(N, K, dtype=torch.float16).cuda()
+    scale = torch.randn(N, 1, dtype=torch.float16).cuda()
 
     scale_row = torch.randn(M, 1, dtype=torch.float16).cuda()
     scale_col = torch.randn(1, N, dtype=torch.float16).cuda()
     y = torch.randn(M, N, dtype=torch.float16).cuda()
 
     ### Quantization
-    qa = quik.symmetric.quantize(src, scale, 8)
-    qa_ref = (src / scale).round().to(torch.int8)
-    assert (torch.equal(qa, qa_ref))
+    qb = quik.symmetric.quantize(src, scale, 8)
+    qb_ref = (src / scale).round().to(torch.int8)
+    assert (torch.equal(qb, qb_ref))
 
     ### Matmul randomizer
-    b = torch.randint(-1, 2, (N, K), dtype=torch.int8).cuda()
+    a_compressed = torch.randint(-3, 3, (M, K // 2), dtype=torch.int8).cuda()
     metadata = quik.matmul.int8GenRandomSparseMeta(M, K)
-    a_uncompressed = quik.matmul.int8Uncompress(qa.cpu(), metadata, M, K)
+    a_uncompressed = quik.matmul.int8Uncompress(a_compressed.cpu(), metadata, M, K)
     a = a_uncompressed.cuda()
-    b = b
+    b = qb
 
     c_ref = torch.matmul(a.float(),
                          b.float().transpose(1, 0)).to(torch.float16)

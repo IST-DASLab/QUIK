@@ -414,15 +414,6 @@ torch::Tensor int8Uncompress(const torch::Tensor &A, const torch::Tensor &E,
   return sparseMatmul<Int8Gemm>::uncompress(A, E, M, K);
 }
 
-#define CHECK_CUDA(func)                                                   \
-  {                                                                        \
-    cudaError_t status = (func);                                           \
-    if (status != cudaSuccess) {                                           \
-      printf("CUDA API failed at line %d with error: %s (%d)\n", __LINE__, \
-             cudaGetErrorString(status), status);                          \
-    }                                                                      \
-  }
-
 #define CHECK_CUSPARSE(func)                                                   \
   {                                                                            \
     cusparseStatus_t status = (func);                                          \
@@ -444,8 +435,10 @@ CusparseLtInt8SpMatmul::CusparseLtInt8SpMatmul(const torch::Tensor &A,
       matmul_(new cusparseLtMatmulDescriptor_t),
       alg_sel_(new cusparseLtMatmulAlgSelection_t),
       plan_(new cusparseLtMatmulPlan_t) {
-  torch::checkAllContiguous("CusparseLtInt8SpMatmul", {{A, "A", 0}, {B, "B", 1}});
-  torch::checkDeviceType("CusparseLtInt8SpMatmul", {A, B}, at::DeviceType::CUDA);
+  torch::checkAllContiguous("CusparseLtInt8SpMatmul",
+                            {{A, "A", 0}, {B, "B", 1}});
+  torch::checkDeviceType("CusparseLtInt8SpMatmul", {A, B},
+                         at::DeviceType::CUDA);
   torch::checkAllSameGPU("CusparseLtInt8SpMatmul", {{A, "A", 0}, {B, "B", 1}});
   M_ = A_.size(0);
   K_ = A_.size(1);

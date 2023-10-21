@@ -223,8 +223,8 @@ torch::Tensor dequantizeCUDA(const torch::Tensor &x, const torch::Tensor &meta,
     dequantizationKernel<<<num_blocks, num_threads>>>(
         out.data_ptr<torch::BFloat16>(), x.data_ptr<int>(),
         meta.data_ptr<torch::BFloat16>(), scaleCol.data_ptr<torch::BFloat16>(),
-        wReduced.data_ptr<torch::BFloat16>(), y.data_ptr<torch::BFloat16>(), rows,
-        cols, shift_value);
+        wReduced.data_ptr<torch::BFloat16>(), y.data_ptr<torch::BFloat16>(),
+        rows, cols, shift_value);
   }
   auto status = cudaGetLastError();
   TORCH_CHECK(status == cudaSuccess,
@@ -527,9 +527,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
   auto fp_x = torch::empty({rows, num_fp},
                            torch::dtype(src.dtype()).device(src.device()));
   int shared_memory_block_size = 2 * num_threads * src.element_size();
-//  std::cout << "Handle " << src.dtype << std::endl;
+  //  std::cout << "Handle " << src.dtype << std::endl;
   if (src.dtype() == torch::kHalf) {
-//    printf("Process half\n");
+    //    printf("Process half\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},
@@ -553,7 +553,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
               cols, num_int, num_fp);
     }
   } else if (src.dtype() == torch::kBFloat16) {
-//    printf("Process bfloat16\n");
+    //    printf("Process bfloat16\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},

@@ -5,23 +5,23 @@
 #include "matmul/matmul_internal.h"
 
 namespace QUIK::matmul {
-torch::Tensor int4Matmul(const torch::Tensor& A, const torch::Tensor& B) {
+torch::Tensor int4Matmul(const torch::Tensor &A, const torch::Tensor &B) {
   torch::checkAllContiguous("int4Matmul", {{A, "A", 0}, {B, "B", 1}});
   // TODO(Tingxuan): support more data type
   torch::checkDeviceType("int4Matmul", {A, B}, at::DeviceType::CUDA);
   return int4MatmulCUDA(A, B);
 }
 
-torch::Tensor int4OutputInt8Matmul(const torch::Tensor& A,
-                                   const torch::Tensor& B) {
+torch::Tensor int4OutputInt8Matmul(const torch::Tensor &A,
+                                   const torch::Tensor &B) {
   torch::checkAllContiguous("int4OutputInt8Matmul", {{A, "A", 0}, {B, "B", 1}});
   // TODO(Tingxuan): support more data type
   torch::checkDeviceType("int4OutputInt8Matmul", {A, B}, at::DeviceType::CUDA);
   return int4OutputInt8MatmulCUDA(A, B);
 }
 
-torch::Tensor int4SpMatmul(const torch::Tensor& A, const torch::Tensor& B,
-                           const torch::Tensor& E) {
+torch::Tensor int4SpMatmul(const torch::Tensor &A, const torch::Tensor &B,
+                           const torch::Tensor &E) {
   torch::checkAllContiguous("int4SpMatmul",
                             {{A, "A", 0}, {B, "B", 1}, {E, "E", 2}});
   // TODO(Tingxuan): support more data type
@@ -29,9 +29,9 @@ torch::Tensor int4SpMatmul(const torch::Tensor& A, const torch::Tensor& B,
   return int4SpMatmulCUDA(A, B, E);
 }
 
-torch::Tensor int4OutputInt8SpMatmul(const torch::Tensor& A,
-                                     const torch::Tensor& B,
-                                     const torch::Tensor& E) {
+torch::Tensor int4OutputInt8SpMatmul(const torch::Tensor &A,
+                                     const torch::Tensor &B,
+                                     const torch::Tensor &E) {
   torch::checkAllContiguous("int4OutputInt8SpMatmul",
                             {{A, "A", 0}, {B, "B", 1}, {E, "E", 2}});
   // TODO(Tingxuan): support more data type
@@ -40,23 +40,23 @@ torch::Tensor int4OutputInt8SpMatmul(const torch::Tensor& A,
   return int4OutputInt8SpMatmulCUDA(A, B, E);
 }
 
-torch::Tensor int8Matmul(const torch::Tensor& A, const torch::Tensor& B) {
+torch::Tensor int8Matmul(const torch::Tensor &A, const torch::Tensor &B) {
   torch::checkAllContiguous("int8Matmul", {{A, "A", 0}, {B, "B", 1}});
   // TODO(Tingxuan): support more data type
   torch::checkDeviceType("int8Matmul", {A, B}, at::DeviceType::CUDA);
   return int8MatmulCUDA(A, B);
 }
 
-torch::Tensor int8OutputInt8Matmul(const torch::Tensor& A,
-                                   const torch::Tensor& B) {
+torch::Tensor int8OutputInt8Matmul(const torch::Tensor &A,
+                                   const torch::Tensor &B) {
   torch::checkAllContiguous("int8OutputInt8Matmul", {{A, "A", 0}, {B, "B", 1}});
   // TODO(Tingxuan): support more data type
   torch::checkDeviceType("int8OutputInt8Matmul", {A, B}, at::DeviceType::CUDA);
   return int8OutputInt8MatmulCUDA(A, B);
 }
 
-torch::Tensor int8SpMatmul(const torch::Tensor& A, const torch::Tensor& B,
-                           const torch::Tensor& E) {
+torch::Tensor int8SpMatmul(const torch::Tensor &A, const torch::Tensor &B,
+                           const torch::Tensor &E) {
   torch::checkAllContiguous("int8SpMatmul",
                             {{A, "A", 0}, {B, "B", 1}, {E, "E", 2}});
   // TODO(Tingxuan): support more data type
@@ -64,9 +64,9 @@ torch::Tensor int8SpMatmul(const torch::Tensor& A, const torch::Tensor& B,
   return int8SpMatmulCUDA(A, B, E);
 }
 
-torch::Tensor int8OutputInt8SpMatmul(const torch::Tensor& A,
-                                     const torch::Tensor& B,
-                                     const torch::Tensor& E) {
+torch::Tensor int8OutputInt8SpMatmul(const torch::Tensor &A,
+                                     const torch::Tensor &B,
+                                     const torch::Tensor &E) {
   torch::checkAllContiguous("int8OutputInt8Matmul",
                             {{A, "A", 0}, {B, "B", 1}, {E, "E", 2}});
   // TODO(Tingxuan): support more data type
@@ -75,7 +75,7 @@ torch::Tensor int8OutputInt8SpMatmul(const torch::Tensor& A,
   return int8OutputInt8SpMatmulCUDA(A, B, E);
 }
 
-void buildSubmodule(py::module& mod) {
+void buildSubmodule(py::module &mod) {
   py::module m = mod.def_submodule("matmul", "Matmul Functions");
   m.def("int4Matmul", &int4Matmul,
         "input: (A: torch.Tensor(M x K, UINT8, CUDA), B: torch.Tensor(N x K, "
@@ -125,7 +125,7 @@ void buildSubmodule(py::module& mod) {
   m.def("int8Uncompress", &int8Uncompress, "");
 
   py::class_<CusparseLtInt8SpMatmul>(m, "CusparseLtInt8SpMatmul")
-      .def(py::init<const torch::Tensor&, const torch::Tensor&, const int>(),
+      .def(py::init<const torch::Tensor &, const torch::Tensor &, const int>(),
            "", py::arg("A"), py::arg("B"), py::arg("alg") = 0)
       .def("compress", &CusparseLtInt8SpMatmul::compress, "")
       .def("matmul_by", &CusparseLtInt8SpMatmul::matmulBy, "", py::arg("B"));
