@@ -41,6 +41,32 @@ torch::Tensor int8GenRandomSparseMeta(int M, int K);
 torch::Tensor int8Uncompress(const torch::Tensor &A, const torch::Tensor &E,
                              int M, int K);
 
+torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
+                                      const torch::Tensor &B,
+                                      const torch::Tensor &scale_row,
+                                      const torch::Tensor &scale_col,
+                                      const torch::Tensor &y);
+
+torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
+                                      const torch::Tensor &B,
+                                      const torch::Tensor &scale_row,
+                                      const torch::Tensor &scale_col,
+                                      const torch::Tensor &y);
+
+torch::Tensor int4SpFusedDequantizeCUDA(const torch::Tensor &A,
+                                        const torch::Tensor &B,
+                                        const torch::Tensor &E,
+                                        const torch::Tensor &scale_row,
+                                        const torch::Tensor &scale_col,
+                                        const torch::Tensor &y);
+
+torch::Tensor int8SpFusedDequantizeCUDA(const torch::Tensor &A,
+                                        const torch::Tensor &B,
+                                        const torch::Tensor &E,
+                                        const torch::Tensor &scale_row,
+                                        const torch::Tensor &scale_col,
+                                        const torch::Tensor &y);
+
 class CusparseLtInt8SpMatmul {
  private:
   using pytorchIndex = torch::IntArrayRef::value_type;

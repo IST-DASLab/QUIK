@@ -113,21 +113,25 @@ shape_list = [256, 512] + \
              [x * 1024 for x in range(1, 15)]
 
 profile_type_list = [
-    samples.Int4MatmulInt32Out,
-    samples.Int4SpMatmulInt32Out,
+    # samples.Int4MatmulInt32Out,
+    # samples.Int4SpMatmulInt32Out,
     samples.Int8MatmulInt32Out,
-    samples.Int8SpMatmulInt32Out,
-    samples.FP16Matmul,
-    samples.FP32Matmul,
-    samples.Int8SpmmCuspLtFp16Out,
+    # samples.Int8SpMatmulInt32Out,
+    # samples.FP16Matmul,
+    # samples.FP32Matmul,
+    # samples.Int8SpmmCuspLtFp16Out,
+    # samples.Int4FusionFp16Out,
+    samples.Int8FusionFp16Out,
 ]
 
 we_dont_need_quant = [
     samples.FP16Matmul,
     samples.FP32Matmul,
+    samples.Int4FusionFp16Out,
+    samples.Int8FusionFp16Out,
 ]
 
-written_data_directory = "test/data/"
+written_data_directory = "test/python/data/"
 
 written_data_dict = {
     "quantization": quant_time_all_type_s,

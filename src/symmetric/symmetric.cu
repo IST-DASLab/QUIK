@@ -3,12 +3,10 @@
 #include "util.h"
 
 namespace QUIK::symmetric {
-__global__ void int4QuantizationCUDAKernel(Int4Storage *__restrict__ dst,
-                                       const torch::Half *__restrict__ scale,
-                                       const torch::Half *__restrict__ src,
-                                       const unsigned rows,
-                                       const unsigned colsSrc,
-                                       unsigned colsDst) {
+__global__ void int4QuantizationCUDAKernel(
+    Int4Storage *__restrict__ dst, const torch::Half *__restrict__ scale,
+    const torch::Half *__restrict__ src, const unsigned rows,
+    const unsigned colsSrc, unsigned colsDst) {
   const unsigned row = threadIdx.y + blockIdx.y * blockDim.y;
   const unsigned colDst = threadIdx.x + blockIdx.x * blockDim.x;
   if (row >= rows || colDst * kElementsPerVector >= colsSrc) {
@@ -109,8 +107,9 @@ __global__ void dequantizationKernel(torch::Half *__restrict__ out,
 
   __half xElement = convertToHalf<T>(x[col + row * cols]);
 
-  out[col + row * cols] = __hmul(__hmul(xElement, scaleRow[row]), scaleCol[col]) + 
-                          y[col + row * cols];
+  out[col + row * cols] =
+      __hmul(__hmul(xElement, scaleRow[row]), scaleCol[col]) +
+      y[col + row * cols];
 }
 
 template <typename T>
@@ -119,16 +118,16 @@ torch::Tensor dequantizationCUDA(const torch::Tensor &x,
                                  const torch::Tensor &scaleCol,
                                  const torch::Tensor &y) {
   torch::checkAllSameGPU("dequantize", {{x, "x", 0},
-                                              {scaleRow, "scaleRow", 1},
-                                              {scaleCol, "scaleCol", 2},
-                                              {y, "y", 3}});
+                                        {scaleRow, "scaleRow", 1},
+                                        {scaleCol, "scaleCol", 2},
+                                        {y, "y", 3}});
   torch::checkSameSize("dequantize", {x, "x", 0}, {y, "y", 1});
   unsigned rows = x.size(0);
   unsigned cols = x.size(1);
-  torch::checkSize("dequantize", torch::TensorArg{scaleRow, "scaleRow", 1},
-                   0, rows);
-  torch::checkSize("dequantize", torch::TensorArg{scaleCol, "scaleCol", 2},
-                   1, cols);
+  torch::checkSize("dequantize", torch::TensorArg{scaleRow, "scaleRow", 1}, 0,
+                   rows);
+  torch::checkSize("dequantize", torch::TensorArg{scaleCol, "scaleCol", 2}, 1,
+                   cols);
   auto out = torch::empty_like(y);
   dim3 block{std::min<unsigned>(cols, 16),
              std::min<unsigned>((rows - 1) + 1, 16)};
@@ -140,15 +139,14 @@ torch::Tensor dequantizationCUDA(const torch::Tensor &x,
   return out;
 }
 template torch::Tensor dequantizationCUDA<int8_t>(const torch::Tensor &x,
-                                                 const torch::Tensor &scaleRow,
-                                                 const torch::Tensor &scaleCol,
-                                                 const torch::Tensor &y);
+                                                  const torch::Tensor &scaleRow,
+                                                  const torch::Tensor &scaleCol,
+                                                  const torch::Tensor &y);
 template torch::Tensor dequantizationCUDA<int>(const torch::Tensor &x,
                                                const torch::Tensor &scaleRow,
                                                const torch::Tensor &scaleCol,
                                                const torch::Tensor &y);
-template torch::Tensor dequantizationCUDA<torch::Half>(const torch::Tensor &x,
-                                                       const torch::Tensor &scaleRow,
-                                                       const torch::Tensor &scaleCol,
-                                                       const torch::Tensor &y);
+template torch::Tensor dequantizationCUDA<torch::Half>(
+    const torch::Tensor &x, const torch::Tensor &scaleRow,
+    const torch::Tensor &scaleCol, const torch::Tensor &y);
 }  // namespace QUIK::symmetric
