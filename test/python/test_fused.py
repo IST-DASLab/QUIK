@@ -30,7 +30,7 @@ def pack_to_i8(X_i4):
     return X_i8
 
 
-def int4_fusion_test():
+def int4_fused_test():
     M = 1024
     N = 5120
     K = 2048
@@ -57,7 +57,7 @@ def int4_fusion_test():
     assert (torch.equal(c, c_ref))
 
 
-def int4_sparse_fusion_test():
+def int4_sparse_fused_test():
     M = 1024
     N = 5120
     K = 2048
@@ -86,7 +86,7 @@ def int4_sparse_fusion_test():
     assert (torch.equal(c, c_ref))
 
 
-def int8_fusion_test():
+def int8_fused_test():
     M = 1024
     N = 5120
     K = 2048
@@ -111,7 +111,7 @@ def int8_fusion_test():
     assert (torch.equal(c, c_ref))
 
 
-def int8_sparse_fusion_test():
+def int8_sparse_fused_test():
     M = 1024
     N = 5120
     K = 2048
@@ -140,8 +140,8 @@ def int8_sparse_fusion_test():
 
 
 if __name__ == "__main__":
-    int4_fusion_test()
-    int4_sparse_fusion_test()
-    int8_fusion_test()
-    int8_sparse_fusion_test()
+    int4_fused_test()
+    int4_sparse_fused_test()
+    int8_fused_test()
+    int8_sparse_fused_test()
     print("Verification passed")
