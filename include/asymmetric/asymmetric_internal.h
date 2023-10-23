@@ -9,6 +9,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
     const torch::Tensor &src, const torch::Tensor &int_indices,
     const torch::Tensor &fp_indices, const int bits);
 
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA2(
+    const torch::Tensor &src, const torch::Tensor &int_indices,
+    const torch::Tensor &fp_indices, const int bits);
+
 torch::Tensor dequantizeCUDA(const torch::Tensor &x, const torch::Tensor &meta,
                              const torch::Tensor &scaleCol,
                              const torch::Tensor &wReduced,
