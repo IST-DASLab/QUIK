@@ -43,86 +43,92 @@ torch::Tensor find_meta(const torch::Tensor &src, const unsigned bits) {
   return findMaxMinMetaCUDA(src, bits);
 }
 
-torch::Tensor int4FusedDequantize(const torch::Tensor &A,
-                                  const torch::Tensor &B,
-                                  const torch::Tensor &scale_row,
-                                  const torch::Tensor &scale_col,
-                                  const float shift_value,
-                                  const torch::Tensor &zero_row,
-                                  const torch::Tensor &w_reduced) {
+torch::Tensor int4FusedDequantize(
+    const torch::Tensor &A, const torch::Tensor &B,
+    const torch::Tensor &scale_row, const torch::Tensor &scale_col,
+    const float shift_value, const torch::Tensor &zero_row,
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   torch::checkAllContiguous("int4FusedDequantize",
-                            {{A, "A", 0},
-                             {B, "B", 1},
-                             {scale_row, "scale_row", 2},
-                             {scale_col, "scale_col", 3},
-
-                             {zero_row, "zero_row", 4},
-                             {w_reduced, "w_reduced", 5}});
+                            {
+                                {A, "A", 0},
+                                {B, "B", 1},
+                                {scale_row, "scale_row", 2},
+                                {scale_col, "scale_col", 3},
+                                {zero_row, "zero_row", 4},
+                                {w_reduced, "w_reduced", 5},
+                                {y, "y", 5},
+                            });
   torch::checkDeviceType("int4FusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
                          at::DeviceType::CUDA);
   return int4FusedDequantizeCUDA(A, B, scale_row, scale_col, shift_value,
-                                 zero_row, w_reduced);
+                                 zero_row, w_reduced, y);
 }
 
-torch::Tensor int8FusedDequantize(const torch::Tensor &A,
-                                  const torch::Tensor &B,
-                                  const torch::Tensor &scale_row,
-                                  const torch::Tensor &scale_col,
-                                  const float shift_value,
-                                  const torch::Tensor &zero_row,
-                                  const torch::Tensor &w_reduced) {
+torch::Tensor int8FusedDequantize(
+    const torch::Tensor &A, const torch::Tensor &B,
+    const torch::Tensor &scale_row, const torch::Tensor &scale_col,
+    const float shift_value, const torch::Tensor &zero_row,
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   torch::checkAllContiguous("int8FusedDequantize",
-                            {{A, "A", 0},
-                             {B, "B", 1},
-                             {scale_row, "scale_row", 2},
-                             {scale_col, "scale_col", 3},
-
-                             {zero_row, "zero_row", 4},
-                             {w_reduced, "w_reduced", 5}});
+                            {
+                                {A, "A", 0},
+                                {B, "B", 1},
+                                {scale_row, "scale_row", 2},
+                                {scale_col, "scale_col", 3},
+                                {zero_row, "zero_row", 4},
+                                {w_reduced, "w_reduced", 5},
+                                {y, "y", 5},
+                            });
   torch::checkDeviceType("int8FusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
                          at::DeviceType::CUDA);
   return int8FusedDequantizeCUDA(A, B, scale_row, scale_col, shift_value,
-                                 zero_row, w_reduced);
+                                 zero_row, w_reduced, y);
 }
 
 torch::Tensor int4SpFusedDequantize(
     const torch::Tensor &A, const torch::Tensor &B, const torch::Tensor &E,
     const torch::Tensor &scale_row, const torch::Tensor &scale_col,
     const float shift_value, const torch::Tensor &zero_row,
-    const torch::Tensor &w_reduced) {
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   torch::checkAllContiguous("int4SpFusedDequantize",
-                            {{A, "A", 0},
-                             {B, "B", 1},
-                             {scale_row, "scale_row", 2},
-                             {scale_col, "scale_col", 3},
-                             {zero_row, "zero_row", 4},
-                             {w_reduced, "w_reduced", 5}});
+                            {
+                                {A, "A", 0},
+                                {B, "B", 1},
+                                {scale_row, "scale_row", 2},
+                                {scale_col, "scale_col", 3},
+                                {zero_row, "zero_row", 4},
+                                {w_reduced, "w_reduced", 5},
+                                {y, "y", 5},
+                            });
   torch::checkDeviceType("int4SpFusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
                          at::DeviceType::CUDA);
   return int4SpFusedDequantizeCUDA(A, B, E, scale_row, scale_col, shift_value,
-                                   zero_row, w_reduced);
+                                   zero_row, w_reduced, y);
 }
 
 torch::Tensor int8SpFusedDequantize(
     const torch::Tensor &A, const torch::Tensor &B, const torch::Tensor &E,
     const torch::Tensor &scale_row, const torch::Tensor &scale_col,
     const float shift_value, const torch::Tensor &zero_row,
-    const torch::Tensor &w_reduced) {
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   torch::checkAllContiguous("int8SpFusedDequantize",
-                            {{A, "A", 0},
-                             {B, "B", 1},
-                             {scale_row, "scale_row", 2},
-                             {scale_col, "scale_col", 3},
-                             {zero_row, "zero_row", 4},
-                             {w_reduced, "w_reduced", 5}});
+                            {
+                                {A, "A", 0},
+                                {B, "B", 1},
+                                {scale_row, "scale_row", 2},
+                                {scale_col, "scale_col", 3},
+                                {zero_row, "zero_row", 4},
+                                {w_reduced, "w_reduced", 5},
+                                {y, "y", 5},
+                            });
   torch::checkDeviceType("int4SpFusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
                          at::DeviceType::CUDA);
   return int8SpFusedDequantizeCUDA(A, B, E, scale_row, scale_col, shift_value,
-                                   zero_row, w_reduced);
+                                   zero_row, w_reduced, y);
 }
 
 void buildSubmodule(py::module &mod) {
@@ -186,7 +192,8 @@ void buildSubmodule(py::module &mod) {
       "output = int4Unpacking(A) @ int4Unpacking(B)^T * scale_cal * scale_row "
       "+(zero_row + shift_value * scale_row) * w_reduced",
       py::arg("A"), py::arg("B"), py::arg("scale_row"), py::arg("scale_col"),
-      py::arg("shift_value"), py::arg("zero_row"), py::arg("w_reduced"));
+      py::arg("shift_value"), py::arg("zero_row"), py::arg("w_reduced"),
+      py::arg("y"));
 
   m.def("int8FusedDequantize", &int8FusedDequantize,
         "input: (A: torch.Tensor(M x K, INT8, CUDA), B: torch.Tensor(N x K, "
@@ -200,7 +207,8 @@ void buildSubmodule(py::module &mod) {
         "output = int4Unpacking(A) @ int4Unpacking(B)^T * scale_cal * "
         "scale_row +(zero_row + shift_value * scale_row) * w_reduced",
         py::arg("A"), py::arg("B"), py::arg("scale_row"), py::arg("scale_col"),
-        py::arg("shift_value"), py::arg("zero_row"), py::arg("w_reduced"));
+        py::arg("shift_value"), py::arg("zero_row"), py::arg("w_reduced"),
+        py::arg("y"));
 
   m.def(
       "int4SpFusedDequantize", &int4SpFusedDequantize,
@@ -217,7 +225,7 @@ void buildSubmodule(py::module &mod) {
       "scale_row) * w_reduced",
       py::arg("A"), py::arg("B"), py::arg("E"), py::arg("scale_row"),
       py::arg("scale_col"), py::arg("shift_value"), py::arg("zero_row"),
-      py::arg("w_reduced"));
+      py::arg("w_reduced"), py::arg("y"));
 
   m.def("int8SpFusedDequantize", &int8SpFusedDequantize,
         "input: (A: torch.Tensor(M x K/2, INT8, CUDA), B: torch.Tensor(N x K, "
@@ -233,6 +241,6 @@ void buildSubmodule(py::module &mod) {
         "scale_row) * w_reduced",
         py::arg("A"), py::arg("B"), py::arg("E"), py::arg("scale_row"),
         py::arg("scale_col"), py::arg("shift_value"), py::arg("zero_row"),
-        py::arg("w_reduced"));
+        py::arg("w_reduced"), py::arg("y"));
 }
 }  // namespace QUIK::asymmetric

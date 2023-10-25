@@ -95,7 +95,7 @@ torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
       {(cutlass::half_t *)y.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)D.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)scale_col.data_ptr<torch::Half>(), N},
-      {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), N},
+      {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), M},
       Gemm::ElementC(1)};
 
   auto status = gemmOp(arguments);
@@ -159,7 +159,7 @@ struct sparseFusedDequantize {
         {(ElementInputE *)E.data_ptr<ElementInputESigned>(),
          ReorderedLayoutInputE::packed(extent)},
         {(cutlass::half_t *)scale_col.data_ptr<torch::Half>(), N},
-        {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), N},
+        {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), M},
         typename Gemm::ElementC(1),
         1};
 

@@ -6,20 +6,20 @@
 
 namespace QUIK::asymmetric {
 
-torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
-                                      const torch::Tensor &B,
-                                      const torch::Tensor &scale_row,
-                                      const torch::Tensor &scale_col,
-                                      const float shift_value,
-                                      const torch::Tensor &zero_row,
-                                      const torch::Tensor &w_reduced) {
-  torch::checkAllSameGPU("int4FusedDequantize", {{A, "A", 0},
-                                                 {B, "B", 1},
-                                                 {scale_row, "scale_row", 2},
-                                                 {scale_col, "scale_col", 3},
-
-                                                 {zero_row, "zero_row", 4},
-                                                 {w_reduced, "w_reduced", 5}});
+torch::Tensor int4FusedDequantizeCUDA(
+    const torch::Tensor &A, const torch::Tensor &B,
+    const torch::Tensor &scale_row, const torch::Tensor &scale_col,
+    const float shift_value, const torch::Tensor &zero_row,
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
+  torch::checkAllSameGPU("int4FusedDequantize", {
+                                                    {A, "A", 0},
+                                                    {B, "B", 1},
+                                                    {scale_row, "scale_row", 2},
+                                                    {scale_col, "scale_col", 3},
+                                                    {zero_row, "zero_row", 4},
+                                                    {w_reduced, "w_reduced", 5},
+                                                    {y, "y", 5},
+                                                });
   auto M = A.size(0);
   auto N = B.size(0);
   auto K = A.size(1) * kElementsPerVector;
@@ -46,6 +46,7 @@ torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
        static_cast<GemmCoord::Index>(K)},
       {(cutlass::int4b_t *)A.data_ptr<uint8_t>(), K},
       {(cutlass::int4b_t *)B.data_ptr<uint8_t>(), K},
+      {(cutlass::half_t *)y.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)D.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)scale_col.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), M},
@@ -61,20 +62,20 @@ torch::Tensor int4FusedDequantizeCUDA(const torch::Tensor &A,
   return D;
 }
 
-torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
-                                      const torch::Tensor &B,
-                                      const torch::Tensor &scale_row,
-                                      const torch::Tensor &scale_col,
-                                      const float shift_value,
-                                      const torch::Tensor &zero_row,
-                                      const torch::Tensor &w_reduced) {
-  torch::checkAllSameGPU("int8FusedDequantize", {{A, "A", 0},
-                                                 {B, "B", 1},
-                                                 {scale_row, "scale_row", 2},
-                                                 {scale_col, "scale_col", 3},
-
-                                                 {zero_row, "zero_row", 4},
-                                                 {w_reduced, "w_reduced", 5}});
+torch::Tensor int8FusedDequantizeCUDA(
+    const torch::Tensor &A, const torch::Tensor &B,
+    const torch::Tensor &scale_row, const torch::Tensor &scale_col,
+    const float shift_value, const torch::Tensor &zero_row,
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
+  torch::checkAllSameGPU("int8FusedDequantize", {
+                                                    {A, "A", 0},
+                                                    {B, "B", 1},
+                                                    {scale_row, "scale_row", 2},
+                                                    {scale_col, "scale_col", 3},
+                                                    {zero_row, "zero_row", 4},
+                                                    {w_reduced, "w_reduced", 5},
+                                                    {y, "y", 5},
+                                                });
   auto M = A.size(0);
   auto N = B.size(0);
   auto K = A.size(1);
@@ -101,6 +102,7 @@ torch::Tensor int8FusedDequantizeCUDA(const torch::Tensor &A,
        static_cast<GemmCoord::Index>(K)},
       {A.data_ptr<int8_t>(), K},
       {B.data_ptr<int8_t>(), K},
+      {(cutlass::half_t *)y.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)D.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)scale_col.data_ptr<torch::Half>(), N},
       {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), M},
@@ -138,13 +140,16 @@ struct sparseFusedDequantize {
       const torch::Tensor &A, const torch::Tensor &B, const torch::Tensor &E,
       const torch::Tensor &scale_row, const torch::Tensor &scale_col,
       const float shift_value, const torch::Tensor &zero_row,
-      const torch::Tensor &w_reduced) {
-    torch::checkAllSameGPU("fusedDequantize", {{A, "A", 0},
-                                               {B, "B", 1},
-                                               {scale_row, "scale_row", 2},
-                                               {scale_col, "scale_col", 3},
-                                               {zero_row, "zero_row", 4},
-                                               {w_reduced, "w_reduced", 5}});
+      const torch::Tensor &w_reduced, const torch::Tensor &y) {
+    torch::checkAllSameGPU("fusedDequantize", {
+                                                  {A, "A", 0},
+                                                  {B, "B", 1},
+                                                  {scale_row, "scale_row", 2},
+                                                  {scale_col, "scale_col", 3},
+                                                  {zero_row, "zero_row", 4},
+                                                  {w_reduced, "w_reduced", 5},
+                                                  {y, "y", 5},
+                                              });
     using cutlassIndex = cutlass::MatrixCoord::Index;
     using pytorchIndex = torch::IntArrayRef::value_type;
 
@@ -164,11 +169,12 @@ struct sparseFusedDequantize {
         {M, N, K},
         {(ElementComputing *)A.data_ptr<Storage>(), K / kSparse},
         {(ElementComputing *)B.data_ptr<Storage>(), K},
+        {(cutlass::half_t *)y.template data_ptr<torch::Half>(), N},
         {(cutlass::half_t *)D.template data_ptr<torch::Half>(), N},
         {(ElementInputE *)E.data_ptr<ElementInputESigned>(),
          ReorderedLayoutInputE::packed(extent)},
         {(cutlass::half_t *)scale_col.data_ptr<torch::Half>(), N},
-        {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), N},
+        {(cutlass::half_t *)scale_row.data_ptr<torch::Half>(), M},
         {(cutlass::half_t *)zero_row.data_ptr<torch::Half>(), M},
         {(cutlass::half_t *)w_reduced.data_ptr<torch::Half>(), N},
         typename Gemm::ElementC(shift_value),
@@ -237,18 +243,18 @@ torch::Tensor int4SpFusedDequantizeCUDA(
     const torch::Tensor &A, const torch::Tensor &B, const torch::Tensor &E,
     const torch::Tensor &scale_row, const torch::Tensor &scale_col,
     const float shift_value, const torch::Tensor &zero_row,
-    const torch::Tensor &w_reduced) {
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   return sparseFusedDequantize<Int4GemmDequant>::fusedDequantize(
-      A, B, E, scale_row, scale_col, shift_value, zero_row, w_reduced);
+      A, B, E, scale_row, scale_col, shift_value, zero_row, w_reduced, y);
 }
 
 torch::Tensor int8SpFusedDequantizeCUDA(
     const torch::Tensor &A, const torch::Tensor &B, const torch::Tensor &E,
     const torch::Tensor &scale_row, const torch::Tensor &scale_col,
     const float shift_value, const torch::Tensor &zero_row,
-    const torch::Tensor &w_reduced) {
+    const torch::Tensor &w_reduced, const torch::Tensor &y) {
   return sparseFusedDequantize<Int8GemmDequant>::fusedDequantize(
-      A, B, E, scale_row, scale_col, shift_value, zero_row, w_reduced);
+      A, B, E, scale_row, scale_col, shift_value, zero_row, w_reduced, y);
 }
 
 }  // namespace QUIK::asymmetric
