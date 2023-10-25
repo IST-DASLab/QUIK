@@ -24,6 +24,17 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantize(
   return quantizeCUDA(src, int_indices, fp_indices, bits);
 }
 
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> quantize2(
+    const torch::Tensor &src, const torch::Tensor &int_indices,
+    const torch::Tensor &fp_indices, int bits) {
+  torch::checkContiguous("quantize", {{src, "src", 0}});
+  TORCH_CHECK(bits == 4 or bits == 8, "bits argument must be either 4 or 8");
+  torch::checkDeviceType("quantize", {src}, at::DeviceType::CUDA);
+  torch::checkDeviceType("quantize", {int_indices}, at::DeviceType::CUDA);
+  torch::checkDeviceType("quantize", {fp_indices}, at::DeviceType::CUDA);
+  return quantizeCUDA2(src, int_indices, fp_indices, bits);
+}
+
 torch::Tensor dequantize(const torch::Tensor &x, const torch::Tensor &meta,
                          const torch::Tensor &scaleCol,
                          const torch::Tensor &wReduced, const torch::Tensor &y,
@@ -151,6 +162,22 @@ void buildSubmodule(py::module &mod) {
       "bits: int 4 or 8 \n"
       "output: tuple: dst: torch.Tensor(M x ceil(N * bits / 8), UINT8, CUDA)\n"
       "meta: torch.Tensor(2M x 1, FP16, CUDA)\n"
+      "fp_x: torch.Tensor(M x NUM_FPs, FP16, CUDA)\n"
+      "dst = int{bits}Packing(int{bits}Rounding((source - meta.zero) / "
+      "meta.scale - 2^{bits - 1}))",
+      "meta: M * [scale, zero]", "meta: full precision features",
+      py::arg("src"), py::arg("int_indices"), py::arg("fp_indices"),
+      py::arg("bits"));
+
+  m.def(
+      "quantize2", &quantize2,
+      "input: (src: torch.Tensor(M x N, FP16, CUDA),\n"
+      "int_indices: (torch.Tensor(NUM_INTs x 1, LONG, CUDA)),\n"
+      "fp_indices: (torch.Tensor(NUM_FPs x 1, LONG, CUDA)),\n"
+      "bits: int 4 or 8 \n"
+      "output: tuple: dst: torch.Tensor(M x ceil(N * bits / 8), UINT8, CUDA)\n"
+      "zeros: torch.Tensor(M x 1, FP16, CUDA)\n"
+      "scales: torch.Tensor(M x 1, FP16, CUDA)\n"
       "fp_x: torch.Tensor(M x NUM_FPs, FP16, CUDA)\n"
       "dst = int{bits}Packing(int{bits}Rounding((source - meta.zero) / "
       "meta.scale - 2^{bits - 1}))",
