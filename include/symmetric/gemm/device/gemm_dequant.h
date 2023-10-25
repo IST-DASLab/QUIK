@@ -44,14 +44,14 @@
 #include "cutlass/gemm/threadblock/threadblock_swizzle.h"
 #include "cutlass/layout/permute.h"
 #include "cutlass/numeric_types.h"
-#include "fused_dequantize/default_gemm_dequant.h"
-#include "fused_dequantize/linear_combination_dequant.h"
+#include "symmetric/epilogue/thread/linear_combination_dequant.h"
+#include "symmetric/gemm/kernel/default_gemm_dequant.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {
 namespace gemm {
 namespace device {
-
+namespace symmetric {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <
@@ -87,10 +87,10 @@ template <
         ElementAccumulator_>::InstructionShape,
     /// Epilogue output operator
     typename EpilogueOutputOp_ =
-        cutlass::epilogue::thread::LinearCombinationDequant<
+        cutlass::epilogue::thread::symmetric::LinearCombinationDequant<
             ElementC_, 128 / cutlass::sizeof_bits<ElementC_>::value,
             ElementAccumulator_, ElementC_,
-            cutlass::epilogue::thread::MyScaleType::RowAndColScaling,
+            cutlass::epilogue::thread::symmetric::MyScaleType::Dequantize,
             cutlass::FloatRoundStyle::round_to_nearest, ElementC_>,
     /// Threadblock-level swizzling operator
     typename ThreadblockSwizzle_ =
@@ -151,7 +151,7 @@ class GemmDequant {
   static ComplexTransform const kTransformB = ComplexTransform::kNone;
 
   /// Define the kernel
-  using GemmKernel = typename kernel::DefaultGemmDequant<
+  using GemmKernel = typename kernel::symmetric::DefaultGemmDequant<
       ElementA, LayoutA, kAlignmentA, ElementB, LayoutB, kAlignmentB, ElementC,
       LayoutC, ElementAccumulator, OperatorClass, ArchTag, ThreadblockShape,
       WarpShape, InstructionShape, EpilogueOutputOp, ThreadblockSwizzle,
@@ -374,6 +374,7 @@ class GemmDequant {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace symmetric
 }  // namespace device
 }  // namespace gemm
 }  // namespace cutlass

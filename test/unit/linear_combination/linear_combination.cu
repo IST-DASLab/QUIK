@@ -34,9 +34,9 @@
 */
 
 #include "../common/cutlass_unit_test.h"
+#include "asymmetric/epilogue/thread/linear_combination_dequant.h"
 #include "cutlass/half.h"
 #include "cutlass/util/reference/host/tensor_fill.h"
-#include "fused_dequantize/linear_combination_dequant.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,10 +48,11 @@ TEST(Epilogue_thread_linear_combination, int32_f16_value) {
   using Layout = cutlass::layout::RowMajor;
   static int const kCount = 4;
 
-  using LinearCombination = cutlass::epilogue::thread::LinearCombinationDequant<
-      ElementOutput, kCount, ElementAccumulator, ElementCompute,
-      cutlass::epilogue::thread::MyScaleType::RowAndColScaling,
-      cutlass::FloatRoundStyle::round_to_nearest, ElementSource>;
+  using LinearCombination =
+      cutlass::epilogue::thread::asymmetric::LinearCombinationDequant<
+          ElementOutput, kCount, ElementAccumulator, ElementCompute,
+          cutlass::epilogue::thread::symmetric::MyScaleType::Dequantize,
+          cutlass::FloatRoundStyle::round_to_nearest, ElementSource>;
 
   ElementCompute beta = ElementCompute(1);
 
@@ -63,12 +64,15 @@ TEST(Epilogue_thread_linear_combination, int32_f16_value) {
   cutlass::Array<ElementSource, kCount> row_vec;
   cutlass::Array<ElementSource, kCount> col_vec;
   cutlass::Array<ElementAccumulator, kCount> accum;
+  cutlass::Array<ElementSource, kCount> zero_vec;
+  cutlass::Array<ElementSource, kCount> w_reduce;
 
   for (int i = 0; i < kCount; ++i) {
     source[i] = ElementSource((i * 7 % 9) - 4);
     accum[i] = ElementAccumulator(i * 2);
     row_vec[i] = ElementSource(i);
     col_vec[i] = ElementSource(kCount + i);
+    zero_vec[i] = ElementSource(kCount + i);
   }
 
   cutlass::Array<ElementOutput, kCount> destination =

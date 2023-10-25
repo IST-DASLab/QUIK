@@ -14,15 +14,15 @@ add_subdirectory(predicated_iterator)
 add_subdirectory(gemm)
 
 
-add_executable(executable run_test.cpp
+add_executable(quiktest run_test.cpp
         ${TEST_UNITS}
 )
-target_include_directories(executable SYSTEM PRIVATE
+target_include_directories(quiktest SYSTEM PRIVATE
         ${CUDA_INCLUDE_DIRS}
         ${PROJECT_SOURCE_DIR}/third-party/googletest/googletest/include
         ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
-target_link_libraries(executable PRIVATE
+target_link_libraries(quiktest PRIVATE
         GTest::gtest_main
         nvidia::cutlass::cutlass
         nvidia::cutlass::tools::util

@@ -62,7 +62,7 @@ namespace cutlass {
 
 namespace epilogue {
 namespace threadblock {
-
+namespace asymmetric {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Tile iterator used to load and store output tile from global memory in
@@ -406,6 +406,7 @@ class PredicatedVColIterator {
   CUTLASS_DEVICE void set_mask(Mask const &mask) { mask_ = mask; }
 };
 
+}  // namespace asymmetric
 }  // namespace threadblock
 }  // namespace epilogue
 }  // namespace cutlass

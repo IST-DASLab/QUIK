@@ -29,6 +29,7 @@
  *POSSIBILITY OF SUCH DAMAGE.
  *
  **************************************************************************************************/
+
 /*! \file
     \brief Template for a pipelined GEMM kernel. Does not compute batching or
    support split-K.
@@ -36,6 +37,7 @@
 
 #pragma once
 
+#include "cutlass/arch/arch.h"
 #include "cutlass/cutlass.h"
 #include "cutlass/gemm/gemm.h"
 #include "cutlass/matrix_coord.h"
@@ -46,6 +48,7 @@
 namespace cutlass {
 namespace gemm {
 namespace kernel {
+namespace asymmetric {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,20 +58,12 @@ template <typename Mma_,  ///! Threadblock-scoped matrix multiply-accumulate
           bool SplitKSerial  ///! If true, code supporting split-K via serial
                              /// reduction is enabled.
           >
-struct SparseGemmDequant {
+struct GemmDequant {
   using Mma = Mma_;
   using Epilogue = Epilogue_;
   using OutputOp = typename Epilogue::OutputOp;
   using ThreadblockSwizzle = ThreadblockSwizzle_;
   static bool const kSplitKSerial = SplitKSerial;
-
-  static int const kSparse = Mma::kSparse;
-  static int const kMetaSizeInBits = Mma::kMetaSizeInBits;
-  static int const kMaxID2 = Mma::kMaxID2;
-  static int const kElementsPerElementE = Mma::kElementsPerElementE;
-
-  using ElementE = typename Mma::ElementE;
-  using LayoutE = typename Mma::LayoutE;
 
   /// Warp count (concept: GemmShape)
   using WarpCount = typename Mma::WarpCount;
@@ -87,27 +82,28 @@ struct SparseGemmDequant {
     typename Epilogue::OutputTileIterator::TensorRef ref_C;
     typename Epilogue::OutputTileIterator::Params params_D;
     typename Epilogue::OutputTileIterator::TensorRef ref_D;
-    typename Mma::IteratorE::Params params_E;
-    typename Mma::IteratorE::TensorRef ref_E;
     typename Epilogue::RowVecIterator::Params params_row_vec;
     typename Epilogue::RowVecIterator::TensorRef ref_row_vec;
     typename Epilogue::ColVecIterator::Params params_col_vec;
     typename Epilogue::ColVecIterator::TensorRef ref_col_vec;
+    typename Epilogue::ColVecIterator::Params params_zero_row_vec;
+    typename Epilogue::ColVecIterator::TensorRef ref_zero_row_vec;
+    typename Epilogue::RowVecIterator::Params params_w_reduce_vec;
+    typename Epilogue::RowVecIterator::TensorRef ref_w_reduce_vec;
     typename OutputOp::Params output_op;
     int *semaphore;
-    int gemm_k_iterations;
     int gemm_k_size;
+    // For gather+scatter operations
+    int const *gather_A_indices;
+    int const *gather_B_indices;
+    int const *scatter_D_indices;
 
     //
     // Methods
     //
 
     CUTLASS_HOST_DEVICE
-    Params()
-        : swizzle_log_tile(0),
-          semaphore(0),
-          gemm_k_iterations(0),
-          gemm_k_size(0) {}
+    Params() : swizzle_log_tile(0), semaphore(0), gemm_k_size(0) {}
 
     CUTLASS_HOST_DEVICE
     Params(cutlass::gemm::GemmCoord const &problem_size,
@@ -116,11 +112,14 @@ struct SparseGemmDequant {
            typename Mma::IteratorB::TensorRef ref_B,
            typename Epilogue::OutputTileIterator::TensorRef ref_C,
            typename Epilogue::OutputTileIterator::TensorRef ref_D,
-           typename Mma::IteratorE::TensorRef ref_E,
            typename Epilogue::RowVecIterator::TensorRef ref_row_vec,
            typename Epilogue::ColVecIterator::TensorRef ref_col_vec,
+           typename Epilogue::ColVecIterator::TensorRef ref_zero_row_vec,
+           typename Epilogue::RowVecIterator::TensorRef ref_w_reduce_vec,
            typename OutputOp::Params output_op = typename OutputOp::Params(),
-           int *workspace = nullptr)
+           int *workspace = nullptr, int const *gather_A_indices = nullptr,
+           int const *gather_B_indices = nullptr,
+           int const *scatter_D_indices = nullptr)
         : problem_size(problem_size),
           grid_tiled_shape(grid_tiled_shape),
           swizzle_log_tile(ThreadblockSwizzle().get_log_tile(grid_tiled_shape)),
@@ -132,13 +131,18 @@ struct SparseGemmDequant {
           ref_C(ref_C),
           params_D(ref_D.layout()),
           ref_D(ref_D),
-          params_E(ref_E.layout()),
-          ref_E(ref_E),
           params_row_vec(ref_row_vec.layout()),
           ref_row_vec(ref_row_vec),
           params_col_vec(ref_col_vec.layout()),
           ref_col_vec(ref_col_vec),
-          output_op(output_op) {
+          params_zero_row_vec(ref_zero_row_vec.layout()),
+          ref_zero_row_vec(ref_zero_row_vec),
+          params_w_reduce_vec(ref_w_reduce_vec.layout()),
+          ref_w_reduce_vec(ref_w_reduce_vec),
+          output_op(output_op),
+          gather_A_indices(gather_A_indices),
+          gather_B_indices(gather_B_indices),
+          scatter_D_indices(scatter_D_indices) {
       int total_gemm_k_iterations =
           (problem_size.k() + Mma::Shape::kK - 1) / Mma::Shape::kK;
       int gemm_k_iterations =
@@ -162,23 +166,44 @@ struct SparseGemmDequant {
   //
 
   CUTLASS_HOST_DEVICE
-  SparseGemmDequant() {}
+  GemmDequant() {}
 
   /// Determines whether kernel satisfies alignment
+  CUTLASS_HOST_DEVICE
   static Status can_implement(
       cutlass::gemm::GemmCoord const &problem_size,
       typename Mma::IteratorA::TensorRef ref_A,
       typename Mma::IteratorB::TensorRef ref_B,
       typename Epilogue::OutputTileIterator::TensorRef ref_C,
       typename Epilogue::OutputTileIterator::TensorRef ref_D,
-      typename Mma::IteratorE::TensorRef ref_E,
       typename Epilogue::RowVecIterator::TensorRef ref_row_vec,
-      typename Epilogue::ColVecIterator::TensorRef ref_col_vec) {
-    static int const kAlignmentA = Mma::IteratorA::AccessType::kElements;
-    static int const kAlignmentB = Mma::IteratorB::AccessType::kElements;
+      typename Epilogue::ColVecIterator::TensorRef ref_col_vec,
+      typename Epilogue::ColVecIterator::TensorRef ref_zero_row_vec,
+      typename Epilogue::RowVecIterator::TensorRef ref_w_reduce_vec) {
+    static int const kAlignmentA =
+        (platform::is_same<typename Mma::IteratorA::Layout,
+                           layout::ColumnMajorInterleaved<32>>::value)
+            ? 32
+        : (platform::is_same<typename Mma::IteratorA::Layout,
+                             layout::ColumnMajorInterleaved<64>>::value)
+            ? 64
+            : Mma::IteratorA::AccessType::kElements;
+    static int const kAlignmentB =
+        (platform::is_same<typename Mma::IteratorB::Layout,
+                           layout::RowMajorInterleaved<32>>::value)
+            ? 32
+        : (platform::is_same<typename Mma::IteratorB::Layout,
+                             layout::RowMajorInterleaved<64>>::value)
+            ? 64
+            : Mma::IteratorB::AccessType::kElements;
     static int const kAlignmentC =
-        Epilogue::OutputTileIterator::kElementsPerAccess;
-    static int const kAlignmentE = Mma::IteratorE::AccessType::kElements;
+        (platform::is_same<typename Epilogue::OutputTileIterator::Layout,
+                           layout::ColumnMajorInterleaved<32>>::value)
+            ? 32
+        : (platform::is_same<typename Epilogue::OutputTileIterator::Layout,
+                             layout::ColumnMajorInterleaved<64>>::value)
+            ? 64
+            : Epilogue::OutputTileIterator::kElementsPerAccess;
 
     if (!TensorRef_aligned(ref_A, kAlignmentA)) {
       return Status::kErrorMisalignedOperand;
@@ -196,10 +221,6 @@ struct SparseGemmDequant {
       return Status::kErrorMisalignedOperand;
     }
 
-    if (!TensorRef_aligned(ref_E, kAlignmentE)) {
-      return Status::kErrorMisalignedOperand;
-    }
-
     if (!TensorRef_aligned(ref_row_vec, kAlignmentC)) {
       return Status::kErrorMisalignedOperand;
     }
@@ -207,27 +228,12 @@ struct SparseGemmDequant {
     if (!TensorRef_aligned(ref_col_vec, kAlignmentC)) {
       return Status::kErrorMisalignedOperand;
     }
-    if ((problem_size.m() % kAlignmentA) ||
-        ((problem_size.k() / kSparse) % kAlignmentA) ||
-        (problem_size.n() % kAlignmentB) || (problem_size.k() % kAlignmentB) ||
-        (problem_size.m() % kAlignmentC) || (problem_size.n() % kAlignmentC) ||
-        (problem_size.m() % kAlignmentE) ||
-        ((problem_size.k() / kSparse) % kAlignmentE)) {
+
+    if (!TensorRef_aligned(ref_zero_row_vec, kAlignmentC)) {
       return Status::kErrorMisalignedOperand;
     }
 
-    // The k dimension has to be the multiple of the Threadblock k because out
-    // of bound meta data would be initialized to 0 by acync.zfill but 0 is not
-    // a valid meta data.
-    if (problem_size.k() % Mma::Shape::kK) {
-      return Status::kErrorMisalignedOperand;
-    }
-
-    // M dimension has to be multiple of 32 (sparse float) or 16 (sparse int)
-    // because of the row reordering of operand E
-    static int const kAlignmentM = (sizeof(ElementE) == 2) ? 32 : 16;
-
-    if (problem_size.m() % kAlignmentM) {
+    if (!TensorRef_aligned(ref_w_reduce_vec, kAlignmentC)) {
       return Status::kErrorMisalignedOperand;
     }
 
@@ -252,17 +258,12 @@ struct SparseGemmDequant {
     // Compute initial location in logical coordinates
     cutlass::MatrixCoord tb_offset_A{
         threadblock_tile_offset.m() * Mma::Shape::kM,
-        threadblock_tile_offset.k() * params.gemm_k_size / kSparse,
+        threadblock_tile_offset.k() * params.gemm_k_size,
     };
 
     cutlass::MatrixCoord tb_offset_B{
         threadblock_tile_offset.k() * params.gemm_k_size,
         threadblock_tile_offset.n() * Mma::Shape::kN};
-
-    cutlass::MatrixCoord tb_offset_E{
-        threadblock_tile_offset.m() * Mma::Shape::kM,
-        threadblock_tile_offset.k() * params.gemm_k_size / kSparse,
-    };
 
     // Problem size is a function of threadblock index in the K dimension
     int problem_size_k =
@@ -271,27 +272,22 @@ struct SparseGemmDequant {
 
     // Compute threadblock-scoped matrix multiply-add
     int gemm_k_iterations =
-        (problem_size_k - tb_offset_B.row() + Mma::Shape::kK - 1) /
+        (problem_size_k - tb_offset_A.column() + Mma::Shape::kK - 1) /
         Mma::Shape::kK;
 
     // Compute position within threadblock
     int thread_idx = threadIdx.x;
 
-    // Construct iterators to A, B, and E operands
+    // Construct iterators to A and B operands
     typename Mma::IteratorA iterator_A(
         params.params_A, params.ref_A.data(),
-        {params.problem_size.m(), problem_size_k / kSparse}, thread_idx,
-        tb_offset_A);
+        {params.problem_size.m(), problem_size_k}, thread_idx, tb_offset_A,
+        params.gather_A_indices);
 
     typename Mma::IteratorB iterator_B(
         params.params_B, params.ref_B.data(),
-        {problem_size_k, params.problem_size.n()}, thread_idx, tb_offset_B);
-
-    typename Mma::IteratorE iterator_E(
-        params.params_E, params.ref_E.data(),
-        {params.problem_size.m(),
-         problem_size_k / kSparse / kElementsPerElementE},
-        thread_idx, tb_offset_E);
+        {problem_size_k, params.problem_size.n()}, thread_idx, tb_offset_B,
+        params.gather_B_indices);
 
     // Broadcast the warp_id computed by lane 0 to ensure dependent code
     // is compiled as warp-uniform.
@@ -311,7 +307,7 @@ struct SparseGemmDequant {
 
     if (!kSplitKSerial || gemm_k_iterations > 0) {
       // Compute threadblock-scoped matrix multiply-add
-      mma(gemm_k_iterations, accumulators, iterator_A, iterator_B, iterator_E,
+      mma(gemm_k_iterations, accumulators, iterator_A, iterator_B,
           accumulators);
     }
 
@@ -353,20 +349,32 @@ struct SparseGemmDequant {
     // Tile iterator loading from source tensor.
     typename Epilogue::OutputTileIterator iterator_C(
         params.params_C, params.ref_C.data(), params.problem_size.mn(),
-        thread_idx, threadblock_offset);
+        thread_idx, threadblock_offset, params.scatter_D_indices);
 
     // Tile iterator writing to destination tensor.
     typename Epilogue::OutputTileIterator iterator_D(
         params.params_D, params.ref_D.data(), params.problem_size.mn(),
-        thread_idx, threadblock_offset);
+        thread_idx, threadblock_offset, params.scatter_D_indices);
 
     typename Epilogue::RowVecIterator iterator_row_vec(
         params.params_row_vec, params.ref_row_vec.data(),
-        params.problem_size.mn(), thread_idx, threadblock_offset);
+        params.problem_size.mn(), thread_idx, threadblock_offset,
+        params.scatter_D_indices);
 
     typename Epilogue::ColVecIterator iterator_col_vec(
         params.params_col_vec, params.ref_col_vec.data(),
-        params.problem_size.mn(), thread_idx, threadblock_offset);
+        params.problem_size.mn(), thread_idx, threadblock_offset,
+        params.scatter_D_indices);
+
+    typename Epilogue::ColVecIterator iterator_zero_row_vec(
+        params.params_zero_row_vec, params.ref_zero_row_vec.data(),
+        params.problem_size.mn(), thread_idx, threadblock_offset,
+        params.scatter_D_indices);
+
+    typename Epilogue::RowVecIterator iterator_w_reduce_vec(
+        params.params_w_reduce_vec, params.ref_w_reduce_vec.data(),
+        params.problem_size.mn(), thread_idx, threadblock_offset,
+        params.scatter_D_indices);
 
     Epilogue epilogue(shared_storage.epilogue, thread_idx, warp_idx, lane_idx);
 
@@ -380,13 +388,11 @@ struct SparseGemmDequant {
       }
 
       semaphore.wait(threadblock_tile_offset.k());
-
-      __threadfence();
     }
 
     // Execute the epilogue operator to update the destination tensor.
     epilogue(output_op, iterator_D, accumulators, iterator_C, iterator_row_vec,
-             iterator_col_vec);
+             iterator_col_vec, iterator_zero_row_vec, iterator_w_reduce_vec);
 
     //
     // Release the semaphore
@@ -402,7 +408,6 @@ struct SparseGemmDequant {
         lock = threadblock_tile_offset.k() + 1;
       }
 
-      __threadfence();
       semaphore.release(lock);
     }
   }
@@ -410,6 +415,7 @@ struct SparseGemmDequant {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace asymmetric
 }  // namespace kernel
 }  // namespace gemm
 }  // namespace cutlass

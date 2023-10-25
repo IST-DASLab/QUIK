@@ -14,6 +14,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # -fPIC
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)  # -fvisibility=hidden
 
 option(BUILD_QUIK_UNIT_TEST "Enable quik unit test." off)
+option(BUILD_QUIK_WITH_CUSPARSELT "Add cusparseLt functions" off)
 
 if (MSVC)
     string(APPEND CMAKE_CXX_FLAGS " /Wall")

@@ -32,15 +32,15 @@
 #pragma once
 
 #include "cutlass/epilogue/threadblock/default_epilogue_tensor_op.h"
-#include "fused_dequantize/epilogue_dequant.h"
-#include "fused_dequantize/predicated_vcol_iterator.h"
-#include "fused_dequantize/predicated_vrow_iterator.h"
+#include "symmetric/epilogue/threadblock/epilogue_dequant.h"
+#include "symmetric/epilogue/threadblock/predicated_vcol_iterator.h"
+#include "symmetric/epilogue/threadblock/predicated_vrow_iterator.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {
 namespace epilogue {
 namespace threadblock {
-
+namespace symmetric {
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Shape_, typename WarpMmaTensorOp_, int PartitionsK,
           typename OutputOp_, int ElementsPerAccess, bool ScatterD = false,
@@ -53,16 +53,18 @@ struct DefaultEpilogueTensorOpDequant
   using DefaultEpilogueTensorOp =
       DefaultEpilogueTensorOp<Shape_, WarpMmaTensorOp_, PartitionsK, OutputOp_,
                               ElementsPerAccess, ScatterD, PermuteDLayout>;
-  using RowVecIterator = cutlass::epilogue::threadblock::PredicatedVRowIterator<
-      typename DefaultEpilogueTensorOp::OutputTileThreadMap,
-      typename DefaultEpilogueTensorOp::ElementOutput, ScatterD, PermuteDLayout,
-      DefaultEpilogueTensorOp::UseCUDAStore>;
-  using ColVecIterator = cutlass::epilogue::threadblock::PredicatedVColIterator<
-      typename DefaultEpilogueTensorOp::OutputTileThreadMap,
-      typename DefaultEpilogueTensorOp::ElementOutput, ScatterD, PermuteDLayout,
-      DefaultEpilogueTensorOp::UseCUDAStore>;
+  using RowVecIterator =
+      cutlass::epilogue::threadblock::symmetric::PredicatedVRowIterator<
+          typename DefaultEpilogueTensorOp::OutputTileThreadMap,
+          typename DefaultEpilogueTensorOp::ElementOutput, ScatterD,
+          PermuteDLayout, DefaultEpilogueTensorOp::UseCUDAStore>;
+  using ColVecIterator =
+      cutlass::epilogue::threadblock::symmetric::PredicatedVColIterator<
+          typename DefaultEpilogueTensorOp::OutputTileThreadMap,
+          typename DefaultEpilogueTensorOp::ElementOutput, ScatterD,
+          PermuteDLayout, DefaultEpilogueTensorOp::UseCUDAStore>;
 
-  using Epilogue = cutlass::epilogue::threadblock::EpilogueDequant<
+  using Epilogue = cutlass::epilogue::threadblock::symmetric::EpilogueDequant<
       typename DefaultEpilogueTensorOp::Shape,
       typename DefaultEpilogueTensorOp::WarpMmaTensorOp,
       DefaultEpilogueTensorOp::kPartitionsK,
@@ -77,6 +79,7 @@ struct DefaultEpilogueTensorOpDequant
 
 ////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace symmetric
 }  // namespace threadblock
 }  // namespace epilogue
 }  // namespace cutlass

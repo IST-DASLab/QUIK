@@ -36,7 +36,7 @@
 #include "cutlass/util/host_tensor.h"
 #include "cutlass/util/reference/host/tensor_fill.h"
 #include "cutlass/util/tensor_view_io.h"
-#include "fused_dequantize/device/gemm_dequant.h"
+#include "symmetric/gemm/device/gemm_dequant.h"
 
 template <typename Element, typename Layout>
 static bool verify_footprint(cutlass::TensorView<Element, Layout> result_view,
@@ -90,7 +90,7 @@ TEST(gemm_s8_s8_f16_f16, tensor_op_128x256x64_64x64x64) {
   using ElementD = ElementC;
   using LayoutD = LayoutC;
 
-  using GemmDequant = cutlass::gemm::device::GemmDequant<
+  using GemmDequant = cutlass::gemm::device::symmetric::GemmDequant<
       ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
       ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm80>;
 

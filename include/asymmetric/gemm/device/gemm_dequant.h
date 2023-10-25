@@ -33,8 +33,11 @@
     \brief Template for a pipelined GEMM kernel. Does not compute batching or
    support split-K.
 */
+
 #pragma once
 
+#include "asymmetric/epilogue/thread/linear_combination_dequant.h"
+#include "asymmetric/gemm/kernel/default_gemm_dequant.h"
 #include "cutlass/arch/arch.h"
 #include "cutlass/cutlass.h"
 #include "cutlass/device_kernel.h"
@@ -43,16 +46,14 @@
 #include "cutlass/gemm/threadblock/threadblock_swizzle.h"
 #include "cutlass/layout/permute.h"
 #include "cutlass/numeric_types.h"
-#include "fused_dequantize/default_gemm_dequant.h"
-#include "fused_dequantize/default_gemm_sparse_dequant.h"
-#include "fused_dequantize/linear_combination_dequant.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {
 namespace gemm {
 namespace device {
-
+namespace asymmetric {
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 template <
     /// Element type for A matrix operand
     typename ElementA_,
@@ -69,9 +70,9 @@ template <
     /// Element type for internal accumulation
     typename ElementAccumulator_ = ElementC_,
     /// Operator class tag
-    typename OperatorClass_ = arch::OpClassSimt,
+    typename OperatorClass_ = arch::OpClassTensorOp,
     /// Tag indicating architecture to tune for
-    typename ArchTag_ = arch::Sm70,
+    typename ArchTag_ = arch::Sm80,
     /// Threadblock-level tile size (concept: GemmShape)
     typename ThreadblockShape_ = typename DefaultGemmConfiguration<
         OperatorClass_, ArchTag_, ElementA_, ElementB_, ElementC_,
@@ -86,10 +87,10 @@ template <
         ElementAccumulator_>::InstructionShape,
     /// Epilogue output operator
     typename EpilogueOutputOp_ =
-        cutlass::epilogue::thread::LinearCombinationDequant<
+        cutlass::epilogue::thread::asymmetric::LinearCombinationDequant<
             ElementC_, 128 / cutlass::sizeof_bits<ElementC_>::value,
             ElementAccumulator_, ElementC_,
-            cutlass::epilogue::thread::MyScaleType::RowAndColScaling,
+            cutlass::epilogue::thread::asymmetric::MyScaleType::Dequantize,
             cutlass::FloatRoundStyle::round_to_nearest, ElementC_>,
     /// Threadblock-level swizzling operator
     typename ThreadblockSwizzle_ =
@@ -111,8 +112,16 @@ template <
     /// Operation performed by GEMM
     typename Operator_ = typename DefaultGemmConfiguration<
         OperatorClass_, ArchTag_, ElementA_, ElementB_, ElementC_,
-        ElementAccumulator_>::Operator>
-class SparseGemmDequant {
+        ElementAccumulator_>::Operator,
+    /// Gather operand A by using an index array
+    bool GatherA = false,
+    /// Gather operand B by using an index array
+    bool GatherB = false,
+    /// Scatter result D by using an index array
+    bool ScatterD = false,
+    /// Permute result D
+    typename PermuteDLayout = layout::NoPermute>
+class GemmDequant {
  public:
   using ElementA = ElementA_;
   using LayoutA = LayoutA_;
@@ -133,7 +142,6 @@ class SparseGemmDequant {
   using EpilogueOutputOp = EpilogueOutputOp_;
   using ThreadblockSwizzle = ThreadblockSwizzle_;
   using Operator = Operator_;
-  using MathOperator = Operator;
   static int const kStages = Stages;
   static int const kAlignmentA = AlignmentA;
   static int const kAlignmentB = AlignmentB;
@@ -143,21 +151,12 @@ class SparseGemmDequant {
   static ComplexTransform const kTransformB = ComplexTransform::kNone;
 
   /// Define the kernel
-  using GemmKernel = typename kernel::DefaultSparseGemmDequant<
+  using GemmKernel = typename kernel::asymmetric::DefaultGemmDequant<
       ElementA, LayoutA, kAlignmentA, ElementB, LayoutB, kAlignmentB, ElementC,
       LayoutC, ElementAccumulator, OperatorClass, ArchTag, ThreadblockShape,
       WarpShape, InstructionShape, EpilogueOutputOp, ThreadblockSwizzle,
-      kStages, kSplitKSerial, Operator>::GemmKernel;
-
-  using ElementE = typename GemmKernel::ElementE;
-
-  using LayoutE = typename GemmKernel::LayoutE;
-
-  static int const kAlignmentE = 128 / sizeof_bits<ElementE>::value;
-
-  static int const kSparse = GemmKernel::kSparse;
-  static int const kMetaSizeInBits = GemmKernel::kMetaSizeInBits;
-  static int const kElementsPerElementE = GemmKernel::kElementsPerElementE;
+      kStages, kSplitKSerial, Operator, SharedMemoryClearOption::kNone, GatherA,
+      GatherB, ScatterD, PermuteDLayout>::GemmKernel;
 
   /// Argument structure
   struct Arguments {
@@ -170,11 +169,16 @@ class SparseGemmDequant {
     TensorRef<ElementB const, LayoutB> ref_B;
     TensorRef<ElementC const, LayoutC> ref_C;
     TensorRef<ElementC, LayoutC> ref_D;
-    TensorRef<ElementE const, LayoutE> ref_E;
     TensorRef<ElementC const, LayoutC> ref_row_vec;
     TensorRef<ElementC const, LayoutC> ref_col_vec;
+    TensorRef<ElementC const, LayoutC> ref_zero_row_vec;
+    TensorRef<ElementC const, LayoutC> ref_w_reduce_vec;
     typename EpilogueOutputOp::Params epilogue;
     int split_k_slices;
+    // For gather+scatter operations
+    int const *gather_A_indices;
+    int const *gather_B_indices;
+    int const *scatter_D_indices;
 
     //
     // Methods
@@ -189,24 +193,29 @@ class SparseGemmDequant {
     Arguments(GemmCoord problem_size_,
               TensorRef<ElementA const, LayoutA> ref_A_,
               TensorRef<ElementB const, LayoutB> ref_B_,
-              TensorRef<ElementC const, LayoutC> ref_C_,
               TensorRef<ElementC, LayoutC> ref_D_,
-              TensorRef<ElementE, LayoutE> ref_E_,
               TensorRef<ElementC const, LayoutC> ref_row_vec_,
               TensorRef<ElementC const, LayoutC> ref_col_vec_,
+              TensorRef<ElementC const, LayoutC> ref_zero_row_vec_,
+              TensorRef<ElementC const, LayoutC> ref_w_reduce_vec_,
               typename EpilogueOutputOp::Params epilogue_ =
                   typename EpilogueOutputOp::Params(),
-              int split_k_slices = 1)
+              int split_k_slices = 1, int const *gather_A_indices_ = nullptr,
+              int const *gather_B_indices_ = nullptr,
+              int const *scatter_D_indices_ = nullptr)
         : problem_size(problem_size_),
           ref_A(ref_A_),
           ref_B(ref_B_),
-          ref_C(ref_C_),
           ref_D(ref_D_),
-          ref_E(ref_E_),
           ref_row_vec(ref_row_vec_),
           ref_col_vec(ref_col_vec_),
+          ref_zero_row_vec(ref_zero_row_vec_),
+          ref_w_reduce_vec(ref_w_reduce_vec_),
           epilogue(epilogue_),
-          split_k_slices(split_k_slices) {}
+          split_k_slices(split_k_slices),
+          gather_A_indices(gather_A_indices_),
+          gather_B_indices(gather_B_indices_),
+          scatter_D_indices(scatter_D_indices_) {}
   };
 
  private:
@@ -215,7 +224,7 @@ class SparseGemmDequant {
 
  public:
   /// Constructs the GEMM.
-  SparseGemmDequant() {}
+  GemmDequant() {}
 
   /// Determines whether the GEMM can execute the given problem.
   static Status can_implement(Arguments const &args) {
@@ -226,8 +235,9 @@ class SparseGemmDequant {
     Status status = GemmKernel::can_implement(
         args.problem_size, args.ref_A.non_const_ref(),
         args.ref_B.non_const_ref(), args.ref_C.non_const_ref(), args.ref_D,
-        args.ref_E.non_const_ref(), args.ref_row_vec.non_const_ref(),
-        args.ref_col_vec.non_const_ref());
+        args.ref_row_vec.non_const_ref(), args.ref_col_vec.non_const_ref(),
+        args.ref_zero_row_vec.non_const_ref(),
+        args.ref_w_reduce_vec.non_const_ref());
 
     if (status != Status::kSuccess) {
       return status;
@@ -293,22 +303,15 @@ class SparseGemmDequant {
                                           args.ref_B.non_const_ref(),
                                           args.ref_C.non_const_ref(),
                                           args.ref_D,
-                                          args.ref_E.non_const_ref(),
                                           args.ref_row_vec.non_const_ref(),
                                           args.ref_col_vec.non_const_ref(),
+                                          args.ref_zero_row_vec.non_const_ref(),
+                                          args.ref_w_reduce_vec.non_const_ref(),
                                           args.epilogue,
-                                          static_cast<int *>(workspace)};
-
-    int smem_size = int(sizeof(typename GemmKernel::SharedStorage));
-    if (smem_size >= (48 << 10)) {
-      cudaError_t result = cudaFuncSetAttribute(
-          Kernel<GemmKernel>, cudaFuncAttributeMaxDynamicSharedMemorySize,
-          smem_size);
-
-      if (result != cudaSuccess) {
-        return Status::kErrorInternal;
-      }
-    }
+                                          static_cast<int *>(workspace),
+                                          args.gather_A_indices,
+                                          args.gather_B_indices,
+                                          args.scatter_D_indices};
 
     return Status::kSuccess;
   }
@@ -325,9 +328,12 @@ class SparseGemmDequant {
     params_.ref_B.reset(args.ref_B.non_const_ref().data());
     params_.ref_C.reset(args.ref_C.non_const_ref().data());
     params_.ref_D.reset(args.ref_D.data());
-    params_.ref_E.reset(args.ref_E.non_const_ref().data());
     params_.ref_row_vec.reset(args.ref_row_vec.non_const_ref().data());
     params_.ref_col_vec.reset(args.ref_col_vec.non_const_ref().data());
+    params_.ref_zero_row_vec.reset(
+        args.ref_zero_row_vec.non_const_ref().data());
+    params_.ref_w_reduce_vec.reset(
+        args.ref_w_reduce_vec.non_const_ref().data());
     params_.output_op = args.epilogue;
     params_.semaphore = static_cast<int *>(workspace);
 
@@ -341,11 +347,23 @@ class SparseGemmDequant {
     dim3 grid = threadblock_swizzle.get_grid_shape(params_.grid_tiled_shape);
     dim3 block(GemmKernel::kThreadCount, 1, 1);
 
+    cudaError_t result;
+
     int smem_size = int(sizeof(typename GemmKernel::SharedStorage));
+
+    if (smem_size >= (48 << 10)) {
+      result = cudaFuncSetAttribute(Kernel<GemmKernel>,
+                                    cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                    smem_size);
+
+      if (result != cudaSuccess) {
+        return Status::kErrorInternal;
+      }
+    }
 
     cutlass::Kernel<GemmKernel><<<grid, block, smem_size, stream>>>(params_);
 
-    cudaError_t result = cudaGetLastError();
+    result = cudaGetLastError();
 
     return result == cudaSuccess ? Status::kSuccess : Status::kErrorInternal;
   }
@@ -366,6 +384,9 @@ class SparseGemmDequant {
   }
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+}  // namespace asymmetric
 }  // namespace device
 }  // namespace gemm
 }  // namespace cutlass

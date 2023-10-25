@@ -67,7 +67,7 @@
 namespace cutlass {
 namespace epilogue {
 namespace threadblock {
-
+namespace asymmetric {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Epilogue operator
@@ -191,10 +191,14 @@ class EpilogueDequant
     OutputTileIterator source_iterator;
     RowVecIterator row_vec_iterator;
     ColVecIterator col_vec_iterator;
+    ColVecIterator zero_row_vec_iterator;
+    RowVecIterator w_reduce_vec_iterator;
 
     typename OutputTileIterator::Fragment source_fragment;
     typename RowVecIterator::Fragment row_vec_fragment;
     typename ColVecIterator::Fragment col_vec_fragment;
+    typename ColVecIterator::Fragment zero_row_vec_fragment;
+    typename RowVecIterator::Fragment w_reduce_vec_fragment;
 
     /// Invoke the output functor over each vector of output
     CUTLASS_DEVICE
@@ -202,9 +206,10 @@ class EpilogueDequant
         typename OutputTileIterator::Fragment &output_fragment,
         OutputOp const &output_op,
         typename SharedLoadIterator::Fragment const &aligned_accum_fragment,
-        typename OutputTileIterator::Fragment const &source_fragment,
         typename RowVecIterator::Fragment const &row_vec_fragment,
-        typename ColVecIterator::Fragment const &col_vec_fragment) {
+        typename ColVecIterator::Fragment const &col_vec_fragment,
+        typename ColVecIterator::Fragment const &zero_row_vec_fragment,
+        typename RowVecIterator::Fragment const &w_reduce_vec_fragment) {
       OutputAccessType *output_frag_ptr =
           reinterpret_cast<OutputAccessType *>(&output_fragment);
 
@@ -212,14 +217,17 @@ class EpilogueDequant
           reinterpret_cast<AccumulatorAccessType const *>(
               &aligned_accum_fragment);
 
-      OutputAccessType const *source_frag_ptr =
-          reinterpret_cast<OutputAccessType const *>(&source_fragment);
-
       OutputAccessType const *row_vec_frag_ptr =
           reinterpret_cast<OutputAccessType const *>(&row_vec_fragment);
 
       OutputAccessType const *col_vec_frag_ptr =
           reinterpret_cast<OutputAccessType const *>(&col_vec_fragment);
+
+      OutputAccessType const *zero_row_vec_vec_frag_ptr =
+          reinterpret_cast<OutputAccessType const *>(&zero_row_vec_fragment);
+
+      OutputAccessType const *w_reduce_vec_frag_ptr =
+          reinterpret_cast<OutputAccessType const *>(&w_reduce_vec_fragment);
 
       int const kOutputOpIterations = OutputTileIterator::Fragment::kElements /
                                       OutputTileIterator::kElementsPerAccess;
@@ -227,9 +235,9 @@ class EpilogueDequant
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < kOutputOpIterations; ++i) {
         // Call the output operator
-        output_frag_ptr[i] =
-            output_op(compute_frag_ptr[i], source_frag_ptr[i],
-                      row_vec_frag_ptr[i], col_vec_frag_ptr[i]);
+        output_frag_ptr[i] = output_op(
+            compute_frag_ptr[i], row_vec_frag_ptr[i], col_vec_frag_ptr[i],
+            zero_row_vec_vec_frag_ptr[i], w_reduce_vec_frag_ptr[i]);
       }
     }
 
@@ -237,13 +245,19 @@ class EpilogueDequant
     CUTLASS_DEVICE
     SourceAspectNeeded(OutputTileIterator source_iterator,
                        RowVecIterator row_vec_iterator,
-                       ColVecIterator col_vec_iterator)
+                       ColVecIterator col_vec_iterator,
+                       ColVecIterator zero_row_vec_iterator,
+                       RowVecIterator w_reduce_vec_iterator)
         : source_iterator(source_iterator),
           row_vec_iterator(row_vec_iterator),
-          col_vec_iterator(col_vec_iterator) {
+          col_vec_iterator(col_vec_iterator),
+          zero_row_vec_iterator(zero_row_vec_iterator),
+          w_reduce_vec_iterator(w_reduce_vec_iterator) {
       source_fragment.clear();
       row_vec_fragment.clear();
       col_vec_fragment.clear();
+      zero_row_vec_fragment.clear();
+      w_reduce_vec_fragment.clear();
     }
 
     // Load addend source fragment from global memory
@@ -252,9 +266,13 @@ class EpilogueDequant
       source_iterator.load(source_fragment);
       row_vec_iterator.load(row_vec_fragment);
       col_vec_iterator.load(col_vec_fragment);
+      zero_row_vec_iterator.load(zero_row_vec_fragment);
+      w_reduce_vec_iterator.load(w_reduce_vec_fragment);
       ++source_iterator;
       ++row_vec_iterator;
       ++col_vec_iterator;
+      ++zero_row_vec_iterator;
+      ++w_reduce_vec_iterator;
     }
 
     /// Invoke the output functor over each vector of output
@@ -264,8 +282,8 @@ class EpilogueDequant
         OutputOp const &output_op,
         typename SharedLoadIterator::Fragment const &aligned_accum_fragment) {
       apply_output_operator(output_fragment, output_op, aligned_accum_fragment,
-                            source_fragment, row_vec_fragment,
-                            col_vec_fragment);
+                            row_vec_fragment, col_vec_fragment,
+                            zero_row_vec_fragment, w_reduce_vec_fragment);
     }
   };
 
@@ -305,11 +323,13 @@ class EpilogueDequant
           &accumulators,  ///< Complete warp-level accumulator tile
       OutputTileIterator source_iterator,  ///< Tile iterator for addend source
       RowVecIterator row_vec_iterator,  ///< Vector iterator for addend source
-      ColVecIterator col_vec_iterator)  ///< Vector iterator for addend source
+      ColVecIterator col_vec_iterator, ColVecIterator zero_row_iterator,
+      RowVecIterator w_reduce_iterator)  ///< Vector iterator for addend source
   {
-    operator()(output_op, destination_iterator, accumulators,
-               SourceAspectNeeded(source_iterator, row_vec_iterator,
-                                  col_vec_iterator));
+    operator()(
+        output_op, destination_iterator, accumulators,
+        SourceAspectNeeded(source_iterator, row_vec_iterator, col_vec_iterator,
+                           zero_row_iterator, w_reduce_iterator));
   }
 
   /// Perform the epilogue computations and stream the result to global memory.
@@ -440,6 +460,7 @@ class EpilogueDequant
 
 ////////////////////////////////////////////////////////////////////////////////
 
+}  // namespace asymmetric
 }  // namespace threadblock
 }  // namespace epilogue
 }  // namespace cutlass
