@@ -118,8 +118,8 @@ class LinearCombinationDequant {
   CUTLASS_HOST_DEVICE
   FragmentOutput operator()(FragmentAccumulator const &accumulator,
                             FragmentSource const &source,
-                            FragmentCompute const &row_vec_alpha,
-                            FragmentCompute const &col_vec_alpha) const {
+                            FragmentSource const &row_vec_alpha,
+                            FragmentSource const &col_vec_alpha) const {
     NumericArrayConverter<ElementCompute, ElementSource, kCount, Round>
         source_converter;
     NumericArrayConverter<ElementCompute, ElementAccumulator, kCount, Round>
@@ -133,15 +133,10 @@ class LinearCombinationDequant {
     FragmentCompute converted_col_vec_alpha = source_converter(col_vec_alpha);
     FragmentCompute converted_accumulator = accumulator_converter(accumulator);
 
-    FragmentCompute intermediate;
-    multiplies<FragmentCompute> multiply;
-
-    intermediate = multiply(beta_, converted_source);
-
     FragmentCompute result;
     torch::Half *result_ptr = reinterpret_cast<torch::Half *>(&result);
-    const torch::Half *intermediate_ptr =
-        reinterpret_cast<const torch::Half *>(&intermediate);
+    const torch::Half *source_ptr =
+        reinterpret_cast<const torch::Half *>(&converted_source);
     const torch::Half *acc_ptr =
         reinterpret_cast<const torch::Half *>(&converted_accumulator);
     const torch::Half *row_vec_ptr =
@@ -152,8 +147,9 @@ class LinearCombinationDequant {
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < kCount; ++i) {
       result_ptr[i] =
-          acc_ptr[i] * col_vec_ptr[i] * row_vec_ptr[i] + intermediate_ptr[i];
+          acc_ptr[i] * col_vec_ptr[i] * row_vec_ptr[i] + beta_ * source_ptr[i];
     }
+
     return destination_converter(result);
   }
 };

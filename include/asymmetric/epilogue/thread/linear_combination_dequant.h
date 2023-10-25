@@ -115,10 +115,11 @@ class LinearCombinationDequant {
 
   CUTLASS_HOST_DEVICE
   FragmentOutput operator()(FragmentAccumulator const &accumulator,
-                            FragmentCompute const &row_vec_alpha,
-                            FragmentCompute const &col_vec_alpha,
-                            FragmentCompute const &zero_row_vec_frag,
-                            FragmentCompute const &W_reduced_frag) const {
+                            FragmentSource const &row_vec_alpha,
+                            FragmentSource const &col_vec_alpha,
+                            FragmentSource const &zero_row_scaling_frag,
+                            FragmentSource const &w_reduced_frag,
+                            FragmentSource const &y_frag) const {
     NumericArrayConverter<ElementCompute, ElementSource, kCount, Round>
         source_converter;
     NumericArrayConverter<ElementCompute, ElementAccumulator, kCount, Round>
@@ -130,37 +131,34 @@ class LinearCombinationDequant {
     FragmentCompute converted_row_vec_alpha = source_converter(row_vec_alpha);
     FragmentCompute converted_col_vec_alpha = source_converter(col_vec_alpha);
     FragmentCompute converted_accumulator = accumulator_converter(accumulator);
-    FragmentCompute converted_zero_row_vec_frag =
-        source_converter(zero_row_vec_frag);
-    FragmentCompute converted_W_reduced_frag = source_converter(W_reduced_frag);
-
-    //    FragmentCompute intermediate;
-    //    multiplies<FragmentCompute> multiply;
-
-    //    intermediate = multiply(shift_value_, converted_col_vec_alpha);
+    FragmentCompute converted_zero_row_scaling =
+        source_converter(zero_row_scaling_frag);
+    FragmentCompute converted_w_reduced = source_converter(w_reduced_frag);
+    FragmentCompute converted_y = source_converter(y_frag);
 
     FragmentCompute result;
     torch::Half *result_ptr = reinterpret_cast<torch::Half *>(&result);
-    //    const torch::Half *intermediate_ptr =
-    //        reinterpret_cast<const torch::Half *>(&intermediate);
+
     const torch::Half *acc_ptr =
         reinterpret_cast<const torch::Half *>(&converted_accumulator);
     const torch::Half *row_vec_ptr =
         reinterpret_cast<const torch::Half *>(&converted_row_vec_alpha);
     const torch::Half *col_vec_ptr =
         reinterpret_cast<const torch::Half *>(&converted_col_vec_alpha);
-    const torch::Half *zero_row_vec =
-        reinterpret_cast<const torch::Half *>(&converted_zero_row_vec_frag);
-    const torch::Half *W_reduced =
-        reinterpret_cast<const torch::Half *>(&converted_W_reduced_frag);
-    const torch::Half *torch_shift_value_ =
-        reinterpret_cast<const torch::Half *>(&shift_value_);
+    const torch::Half *zero_row_scaling_ptr =
+        reinterpret_cast<const torch::Half *>(&converted_zero_row_scaling);
+    const torch::Half *w_reduced_ptr =
+        reinterpret_cast<const torch::Half *>(&converted_w_reduced);
+    const torch::Half *y_ptr =
+        reinterpret_cast<const torch::Half *>(&converted_y);
 
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < kCount; ++i) {
       result_ptr[i] = acc_ptr[i] * row_vec_ptr[i] * col_vec_ptr[i] +
-                      (zero_row_vec[i] + *torch_shift_value_ * col_vec_ptr[i]) *
-                          W_reduced[i];
+                      (zero_row_scaling_ptr[i] +
+                       (torch::Half)shift_value_ * col_vec_ptr[i]) *
+                          w_reduced_ptr[i] +
+                      y_ptr[i];
     }
     return destination_converter(result);
   }

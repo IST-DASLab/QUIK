@@ -188,13 +188,13 @@ class EpilogueDequant
  public:
   /// Aspect for when epilogue source is needed
   struct SourceAspectNeeded {
-    OutputTileIterator source_iterator;
+    OutputTileIterator y_iterator;
     RowVecIterator row_vec_iterator;
     ColVecIterator col_vec_iterator;
     ColVecIterator zero_row_vec_iterator;
     RowVecIterator w_reduce_vec_iterator;
 
-    typename OutputTileIterator::Fragment source_fragment;
+    typename OutputTileIterator::Fragment y_fragment;
     typename RowVecIterator::Fragment row_vec_fragment;
     typename ColVecIterator::Fragment col_vec_fragment;
     typename ColVecIterator::Fragment zero_row_vec_fragment;
@@ -208,8 +208,9 @@ class EpilogueDequant
         typename SharedLoadIterator::Fragment const &aligned_accum_fragment,
         typename RowVecIterator::Fragment const &row_vec_fragment,
         typename ColVecIterator::Fragment const &col_vec_fragment,
-        typename ColVecIterator::Fragment const &zero_row_vec_fragment,
-        typename RowVecIterator::Fragment const &w_reduce_vec_fragment) {
+        typename ColVecIterator::Fragment const &zero_row_scaling_fragment,
+        typename RowVecIterator::Fragment const &w_reduce_fragment,
+        typename OutputTileIterator::Fragment const &y_fragment) {
       OutputAccessType *output_frag_ptr =
           reinterpret_cast<OutputAccessType *>(&output_fragment);
 
@@ -223,11 +224,15 @@ class EpilogueDequant
       OutputAccessType const *col_vec_frag_ptr =
           reinterpret_cast<OutputAccessType const *>(&col_vec_fragment);
 
-      OutputAccessType const *zero_row_vec_vec_frag_ptr =
-          reinterpret_cast<OutputAccessType const *>(&zero_row_vec_fragment);
+      OutputAccessType const *zero_row_scaling_frag_ptr =
+          reinterpret_cast<OutputAccessType const *>(
+              &zero_row_scaling_fragment);
 
-      OutputAccessType const *w_reduce_vec_frag_ptr =
-          reinterpret_cast<OutputAccessType const *>(&w_reduce_vec_fragment);
+      OutputAccessType const *w_reduce_frag_ptr =
+          reinterpret_cast<OutputAccessType const *>(&w_reduce_fragment);
+
+      OutputAccessType const *y_frag_ptr =
+          reinterpret_cast<OutputAccessType const *>(&y_fragment);
 
       int const kOutputOpIterations = OutputTileIterator::Fragment::kElements /
                                       OutputTileIterator::kElementsPerAccess;
@@ -237,7 +242,7 @@ class EpilogueDequant
         // Call the output operator
         output_frag_ptr[i] = output_op(
             compute_frag_ptr[i], row_vec_frag_ptr[i], col_vec_frag_ptr[i],
-            zero_row_vec_vec_frag_ptr[i], w_reduce_vec_frag_ptr[i]);
+            zero_row_scaling_frag_ptr[i], w_reduce_frag_ptr[i], y_frag_ptr[i]);
       }
     }
 
@@ -248,12 +253,12 @@ class EpilogueDequant
                        ColVecIterator col_vec_iterator,
                        ColVecIterator zero_row_vec_iterator,
                        RowVecIterator w_reduce_vec_iterator)
-        : source_iterator(source_iterator),
+        : y_iterator(source_iterator),
           row_vec_iterator(row_vec_iterator),
           col_vec_iterator(col_vec_iterator),
           zero_row_vec_iterator(zero_row_vec_iterator),
           w_reduce_vec_iterator(w_reduce_vec_iterator) {
-      source_fragment.clear();
+      y_fragment.clear();
       row_vec_fragment.clear();
       col_vec_fragment.clear();
       zero_row_vec_fragment.clear();
@@ -263,12 +268,12 @@ class EpilogueDequant
     // Load addend source fragment from global memory
     CUTLASS_DEVICE
     void load() {
-      source_iterator.load(source_fragment);
+      y_iterator.load(y_fragment);
       row_vec_iterator.load(row_vec_fragment);
       col_vec_iterator.load(col_vec_fragment);
       zero_row_vec_iterator.load(zero_row_vec_fragment);
       w_reduce_vec_iterator.load(w_reduce_vec_fragment);
-      ++source_iterator;
+      ++y_iterator;
       ++row_vec_iterator;
       ++col_vec_iterator;
       ++zero_row_vec_iterator;
@@ -283,7 +288,8 @@ class EpilogueDequant
         typename SharedLoadIterator::Fragment const &aligned_accum_fragment) {
       apply_output_operator(output_fragment, output_op, aligned_accum_fragment,
                             row_vec_fragment, col_vec_fragment,
-                            zero_row_vec_fragment, w_reduce_vec_fragment);
+                            zero_row_vec_fragment, w_reduce_vec_fragment,
+                            y_fragment);
     }
   };
 
@@ -320,15 +326,15 @@ class EpilogueDequant
       OutputTileIterator
           destination_iterator,  ///< Tile iterator for destination
       AccumulatorTile const
-          &accumulators,  ///< Complete warp-level accumulator tile
-      OutputTileIterator source_iterator,  ///< Tile iterator for addend source
+          &accumulators,              ///< Complete warp-level accumulator tile
+      OutputTileIterator y_iterator,  ///< Tile iterator for addend source
       RowVecIterator row_vec_iterator,  ///< Vector iterator for addend source
       ColVecIterator col_vec_iterator, ColVecIterator zero_row_iterator,
       RowVecIterator w_reduce_iterator)  ///< Vector iterator for addend source
   {
     operator()(
         output_op, destination_iterator, accumulators,
-        SourceAspectNeeded(source_iterator, row_vec_iterator, col_vec_iterator,
+        SourceAspectNeeded(y_iterator, row_vec_iterator, col_vec_iterator,
                            zero_row_iterator, w_reduce_iterator));
   }
 
