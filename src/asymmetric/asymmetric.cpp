@@ -67,7 +67,7 @@ torch::Tensor int4FusedDequantize(
                                 {scale_col, "scale_col", 3},
                                 {zero_row, "zero_row", 4},
                                 {w_reduced, "w_reduced", 5},
-                                {y, "y", 5},
+                                {y, "y", 6},
                             });
   torch::checkDeviceType("int4FusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
@@ -89,7 +89,7 @@ torch::Tensor int8FusedDequantize(
                                 {scale_col, "scale_col", 3},
                                 {zero_row, "zero_row", 4},
                                 {w_reduced, "w_reduced", 5},
-                                {y, "y", 5},
+                                {y, "y", 6},
                             });
   torch::checkDeviceType("int8FusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
@@ -111,7 +111,7 @@ torch::Tensor int4SpFusedDequantize(
                                 {scale_col, "scale_col", 3},
                                 {zero_row, "zero_row", 4},
                                 {w_reduced, "w_reduced", 5},
-                                {y, "y", 5},
+                                {y, "y", 6},
                             });
   torch::checkDeviceType("int4SpFusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},
@@ -133,7 +133,7 @@ torch::Tensor int8SpFusedDequantize(
                                 {scale_col, "scale_col", 3},
                                 {zero_row, "zero_row", 4},
                                 {w_reduced, "w_reduced", 5},
-                                {y, "y", 5},
+                                {y, "y", 6},
                             });
   torch::checkDeviceType("int4SpFusedDequantize",
                          {A, B, scale_row, scale_col, zero_row, w_reduced},

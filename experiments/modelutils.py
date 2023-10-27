@@ -1,10 +1,8 @@
 import torch
-import quant_sim
 import transformers
 from qlinear import MixedQLinear
 from quant_sim import ActQuantWrapper
 import os
-
 
 def get_fp_features_num(module: torch.nn.Linear, args, model=None):
     fp_features_num = args.fp_features_num
@@ -19,8 +17,7 @@ def skip(*args, **kwargs):
     pass
 
 
-def find_layers(module, layers=[torch.nn.Linear, quant_sim.ActQuantWrapper,
-                                transformers.models.falcon.modeling_falcon.FalconLinear], name=''):
+def find_layers(module, layers=[torch.nn.Linear, ActQuantWrapper], name=''):
     for layer in layers:
         if isinstance(module, layer):
             return {name: module}
@@ -33,15 +30,6 @@ def find_layers(module, layers=[torch.nn.Linear, quant_sim.ActQuantWrapper,
         ))
     return res
 
-
-def get_opt(model):
-    torch.nn.init.kaiming_uniform_ = skip
-    torch.nn.init.uniform_ = skip
-    torch.nn.init.normal_ = skip
-    print('Loading {} Model...'.format(model))
-    model = transformers.OPTForCausalLM.from_pretrained(model, torch_dtype='auto')
-    model.seqlen = model.config.max_position_embeddings
-    return model
 
 
 
@@ -71,7 +59,6 @@ def get_llama(model_name, seqlen, hf_token):
         config.to_json_file(config_path, use_diff=False)
     model.seqlen = seqlen
     return model
-
 
 
 def replace_single_mod_opt(module, name, layer_to_replace):

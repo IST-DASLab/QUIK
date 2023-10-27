@@ -7,7 +7,8 @@ This repository contains the code for QUIK, weights and activations post-trainin
 
 - cmake
 - C++ compiler (GCC/clang/...)
-- nvcc
+- CUDA (tested with 11.8)
+
 
 ### Instructions
 
@@ -24,7 +25,7 @@ pip install -e .  # or pip install .
 cd experiments
 pip install -r requirements.txt
 python llama.py --fp_features_num 256 --model meta-llama/Llama-2-7b-hf --hf-token $HF_TOKEN --dataset c4 \ 
---w_bits 4 --a_bits 4 --save_qmodel_path save_gptq_model_path --int8_down_proj --sim-eval --benchmark 
+--w_bits 4 --a_bits 4 --load_qmodel_path gptq_model_path --int8_down_proj --benchmark 
 ```
 
 Benchmark will be run on all available GPUs.
@@ -38,33 +39,3 @@ From that we get quantized weights (that are still stored in `torch.float16`).
 Then ones needs create QUIK Linear layers using `qlinear.MixedQLinear.from_float` that must replace original Linear layers. See `llama_replace_with_kernels` in `llama.py`.
 Now the quantized model is ready for use.
 
-
-### Quantization pipeline
-
-```python
-import torch
-
-import quik
-
-dtype = torch.half
-
-x = torch.rand((input_size, hidden_size)).cuda().to(dtype)
-int_indices, fp_indices = ...  # extract from the SmoothQuant activations.
-weight_matrix == ...  # original weights
-reduced_w = torch.sum(weight_matrix[:, int_indices].float(), dim=1, keepdim=True).to(weight_matrix.dtype)
-int_weight = ...  # weights are split according to indices and quantized using GPTQ 
-fp_weight = weight_matrix[:, fp_indices]  # the weights that are kept in full precision
-weights_scales = ...  # scales from GPTQ
-
-BITS = 4
-q_int, meta, fp_x = quik.asymmetric.quantize(x.cuda().half(), int_indices, fp_indices, BITS)
-int_result = quik.matmul.int4Matmul(qint_x, int_weight)
-fp_result = torch.nn.functional.linear(fp_x, fp_weight)
-
-output = quik.asymmetric.dequantize(int_result, meta, weights_scales,
-                                    reduced_w, fp_result, BITS)
-```
-
-### TODO
-- Add opt, falcon experiments
-- Optimize kernels, merging dequantization into cutlass matmul epilogue

@@ -1,1 +1,1 @@
-add_qgpt_unit_test()
+add_quik_unit_test()

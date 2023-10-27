@@ -670,9 +670,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
   auto fp_x = torch::empty({rows, num_fp},
                            torch::dtype(src.dtype()).device(src.device()));
   int shared_memory_block_size = 2 * num_threads * src.element_size();
-  //  std::cout << "Handle " << src.dtype << std::endl;
   if (src.dtype() == torch::kHalf) {
-    //    printf("Process half\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},
@@ -696,7 +694,6 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> quantizeCUDA(
               cols, num_int, num_fp);
     }
   } else if (src.dtype() == torch::kBFloat16) {
-    //    printf("Process bfloat16\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},
@@ -766,9 +763,7 @@ quantizeCUDA2(const torch::Tensor &src, const torch::Tensor &int_indices,
   auto fp_x = torch::empty({rows, num_fp},
                            torch::dtype(src.dtype()).device(src.device()));
   int shared_memory_block_size = 2 * num_threads * src.element_size();
-  //  std::cout << "Handle " << src.dtype << std::endl;
   if (src.dtype() == torch::kHalf) {
-    //    printf("Process half\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},
@@ -792,7 +787,6 @@ quantizeCUDA2(const torch::Tensor &src, const torch::Tensor &int_indices,
               fp_indices.data_ptr<long>(), rows, cols, num_int, num_fp);
     }
   } else if (src.dtype() == torch::kBFloat16) {
-    //    printf("Process bfloat16\n");
     if (bits == 4) {
       dst = torch::empty(
           {rows, num_int / 2},

@@ -1,5 +1,5 @@
 set(TEST_UNITS "")
-macro(add_qgpt_unit_test)
+macro(add_quik_unit_test)
     file(GLOB_RECURSE srcs CONFIGURE_DEPENDS
             ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/*.cc
