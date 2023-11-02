@@ -52,6 +52,7 @@ def llama_parser():
 
     # Weight Quantization Params: 
     parser.add_argument('--w_bits', type=int, default=16, choices=[4, 8, 16])
+    parser.add_argument('--w_clip', action='store_true', help='Use clipping for weight quantization')
     parser.add_argument('--w_asym', action='store_true')
     
     parser.add_argument('--int8_down_proj', action='store_true', help='Use INT8 for Down Projection')
@@ -166,7 +167,7 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
                     if args.int8_down_proj:
                         current_w_bits = 8
                 modules_quik[name].quantizer.configure(
-                    current_w_bits, perchannel=True, sym=not(args.w_asym),
+                    current_w_bits, perchannel=True, sym=not(args.w_asym), mse=args.w_clip
                 )
 
             def add_batch(name):

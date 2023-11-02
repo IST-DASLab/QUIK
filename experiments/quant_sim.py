@@ -29,7 +29,7 @@ class WeightQuantizer(torch.nn.Module):
 
     def configure(
             self,
-            bits, perchannel=False, sym=True, 
+            bits, perchannel=False, sym=True, mse=False,
         ):
         self.bits = bits
         if sym:
@@ -48,6 +48,10 @@ class WeightQuantizer(torch.nn.Module):
                 raise ValueError('Only 4/8-bit is supported!')
         self.perchannel = perchannel
         self.sym = sym
+        self.mse = mse
+        self.grid = 100
+        self.maxshrink = 0.8
+        self.norm = 2.4
 
     def find_params(self, x):
         dev = x.device
@@ -80,6 +84,32 @@ class WeightQuantizer(torch.nn.Module):
             self.scale = (xmax - xmin) / self.maxq
             self.zero = torch.round(-xmin / self.scale)
 
+        if self.mse:
+            best = torch.full([x.shape[0]], float('inf'), device=dev)
+            for i in range(int(self.maxshrink * self.grid)):
+                p = 1 - i / self.grid 
+                xmax1 = p * xmax
+                xmin1 = p * xmin
+
+                if self.sym:
+                    scale1 = xmax1 / self.maxq
+                    zero1 = torch.zeros_like(scale1)
+                    q = symmetric_quantize(x, scale1.unsqueeze(1), self.bits)
+                else:
+                    
+                    scale1 = (xmax1 - xmin1) / self.maxq
+                    zero1 = torch.round(-xmin1 / scale1)
+                    q = asymmetric_quantize(x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq)           
+                q -= x
+                q.abs_()
+                q.pow_(self.norm)
+                err = torch.sum(q, 1)
+                tmp = err < best
+                if torch.any(tmp):
+                    best[tmp] = err[tmp]
+                    self.scale[tmp] = scale1[tmp]
+                    self.zero[tmp] = zero1[tmp]
+            
         if not self.perchannel:
             tmp = shape[0]
             self.scale = self.scale.repeat(tmp)
