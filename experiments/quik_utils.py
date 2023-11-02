@@ -3,7 +3,7 @@ import torch
 import math
 
 
-class QGPT:
+class QUIK:
     def __init__(self, layer,
                  act_scales=None,
                  fp_features=0):
@@ -11,7 +11,7 @@ class QGPT:
         if isinstance(layer, quant_sim.ActQuantWrapper):
             layer = layer.module
             
-        assert isinstance(layer, torch.nn.Linear), 'QGPT only supports torch.nn.Linear layers!'
+        assert isinstance(layer, torch.nn.Linear), 'QUIK only supports torch.nn.Linear layers!'
                   
         self.layer = layer
         self.dev = self.layer.weight.device

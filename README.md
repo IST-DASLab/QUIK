@@ -23,8 +23,8 @@ pip install -e .  # or pip install .
 ```bash
 cd experiments
 pip install -r requirements.txt
-python llama.py --fp_features_num 256 --model meta-llama/Llama-2-7b-hf --hf-token $HF_TOKEN --dataset c4 \ 
---w_bits 4 --a_bits 4 --save_qmodel_path save_gptq_model_path --int8_down_proj --sim-eval --benchmark 
+python llama.py --fp_features_num 256 --model meta-llama/Llama-2-7b-hf --hf_token <your_hf_token> --dataset c4 \ 
+--w_bits 4 --a_bits 4 --save_qmodel_path save_gptq_model_path --int8_down_proj --sim_eval --benchmark 
 ```
 
 Benchmark will be run on all available GPUs.
@@ -65,6 +65,6 @@ output = quik.asymmetric.dequantize(int_result, meta, weights_scales,
                                     reduced_w, fp_result, BITS)
 ```
 
-### TODO
-- Add opt, falcon experiments
-- Optimize kernels, merging dequantization into cutlass matmul epilogue
+### Fake Quantization example
+
+To run the fake quantization example, check `experiments/fake_quant` directory.

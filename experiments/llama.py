@@ -3,7 +3,7 @@ import datautils
 import modelutils
 import torch
 import time
-import qgpt_utils
+import quik_utils
 import quant_sim
 import qlinear
 import tqdm
@@ -60,7 +60,7 @@ def llama_parser():
     parser.add_argument('--wandb', action='store_true')
     parser.add_argument('--wandb_name', type=str, default='name')
     
-    parser.add_argument('--synthetic_data', action='store_true')
+    parser.add_argument('--synthetic_data', action='store_true', help='Use synthetic data (for debugging).')
     parser.add_argument('--hf_token', type=str, default='')
 
     parser.add_argument('--load_qmodel_path', type=str, default=None)
@@ -71,9 +71,6 @@ def llama_parser():
     parser.add_argument('--benchmark', action='store_true')
 
     args = parser.parse_args()
-    
-    if args.int8_down_proj and args.fp_down_proj:
-        raise ValueError('Cannot use both INT8 and FP16 for Down Projection!')
     
     return args
 
@@ -149,7 +146,7 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
             
             
 
-            modules_qgpt = {}
+            modules_quik = {}
             for name in subset:
 
                 if args.fp_features_num > 0 or args.fp_features_frac is not None:
@@ -157,26 +154,24 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
                 else:
                     layer_scales = None
                 fp_features_num = get_fp_features_num(subset[name], args)
-                modules_qgpt[name] = qgpt_utils.QGPT(
+                modules_quik[name] = quik_utils.QUIK(
                 layer=subset[name],
                 act_scales=layer_scales,
                 fp_features=fp_features_num
                 )
-                modules_qgpt[name].quantizer = quant_sim.WeightQuantizer()
+                modules_quik[name].quantizer = quant_sim.WeightQuantizer()
 
                 current_w_bits = args.w_bits 
                 if 'down_proj' in name:
                     if args.int8_down_proj:
                         current_w_bits = 8
-                    elif args.fp_down_proj:
-                        raise ValueError('We do not support A16W16 for Down Projection!')
-                modules_qgpt[name].quantizer.configure(
+                modules_quik[name].quantizer.configure(
                     current_w_bits, perchannel=True, sym=not(args.w_asym),
                 )
 
             def add_batch(name):
                 def tmp(_, inp, out):
-                    modules_qgpt[name].add_batch(inp[0].data, out.data)
+                    modules_quik[name].add_batch(inp[0].data, out.data)
                 return tmp
             handles = []
             for name in subset:
@@ -188,17 +183,17 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
 
             for name in subset:
                 print(' {} '.format(name), end='', flush=True)
-                modules_qgpt[name].fasterquant(percdamp=args.percdamp, groupsize=-1)
-                quantizers['model.layers.%d.%s' % (i, name)] = modules_qgpt[name].quantizer
-                save_dict['model.layers.%d.%s.scale' % (i, name)] = modules_qgpt[name].quantizer.scale
-                modules_qgpt[name].free()
+                modules_quik[name].fasterquant(percdamp=args.percdamp, groupsize=-1)
+                quantizers['model.layers.%d.%s' % (i, name)] = modules_quik[name].quantizer
+                save_dict['model.layers.%d.%s.scale' % (i, name)] = modules_quik[name].quantizer.scale
+                modules_quik[name].free()
 
         for j in range(args.nsamples):
             outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
 
         layers[i] = layer.cpu()
         del layer
-        del modules_qgpt 
+        del modules_quik 
         torch.cuda.empty_cache()
 
         inps, outs = outs, inps
@@ -485,41 +480,17 @@ if __name__ == '__main__':
         layers = modelutils.find_layers(model)
 
         for name in layers:
-            # if ".0." not in name:
-            #     continue
-            # print(f"Found name: {name}")
+            
             bits = args.a_bits
             if 'lm_head' in name or "rotary_emb" in name:
                 print(f'Skipping {name}\n')
                 continue 
             
-            if args.fp_mlp:
-                if 'mlp' in name:
-                    print(f'Skipping {name}')
-                    continue
-            if args.fp_up_proj and 'up_proj' in name:
-                print(f'Skipping {name}')
-                continue 
             
             if 'down_proj' in name:
-                if args.fp_down_proj:
-                    print(f'Skipping {name}')
-                    continue
-                elif args.int8_down_proj:
-                    bits = 8
-                    # print(f'Configuring {name} to INT8')
-
-            if args.fp_down_proj and 'down_proj' in name:
-                print(f'Skipping {name}')
-                continue
-            if args.fp_gate_proj and 'gate_proj' in name:
-                print(f'Skipping {name}')
-                continue
+                if args.int8_down_proj:
+                    bits = 8       
             
-            if args.fp_attn:
-                if 'self_attn' in name:
-                    print(f'Skipping {name}')
-                    continue
             if args.fp_features_num > 0 or args.fp_features_frac is not None:
                 fp_features_num = get_fp_features_num(layers[name].module, args)
                 if "qkv" in name:
