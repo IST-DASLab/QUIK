@@ -49,13 +49,13 @@ To run the fake quantization example, check [`fake_quant`](https://github.com/IS
 
 ### Citation 
 
-The full paper is available on arxiv. 
-The full citation is
+The full paper is available on arxiv. The full citation is
 
+```
 @article{QUIK,
-  title={Towards End-to-end 4-Bit Inference on Generative Large Language Models},
+  title={QUIK: Towards End-to-end 4-Bit Inference on Generative Large Language Models},
   author={Ashkboos, Saleh and Markov, Ilia and Frantar, Elias and Zhong, Tingxuan and Wang, Xincheng and Ren, Jie and Hoefler, Torsten and Alistarh, Dan},
   journal={arXiv preprint arXiv:2310.09259},
   year={2023}
 }
-
+```
