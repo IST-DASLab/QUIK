@@ -1,5 +1,9 @@
 # QUIK
-This repository contains the code for QUIK, weights and activations post-training quantization.
+This repository contains the code for QUIK, a method for quantizing the majority of the weights and activations to **4bit** post-training.
+
+QUIK is described in the following paper: 
+https://arxiv.org/abs/2310.09259
+
 
 ## Install
 
@@ -42,3 +46,16 @@ Now the quantized model is ready for use.
 ### Fake Quantization examples
 
 To run the fake quantization example, check [`fake_quant`](https://github.com/IST-DASLab/QUIK/tree/master/experiments/fake_quant) directory.
+
+### Citation 
+
+The full paper is available on arxiv. 
+The full citation is
+
+@article{QUIK,
+  title={Towards End-to-end 4-Bit Inference on Generative Large Language Models},
+  author={Ashkboos, Saleh and Markov, Ilia and Frantar, Elias and Zhong, Tingxuan and Wang, Xincheng and Ren, Jie and Hoefler, Torsten and Alistarh, Dan},
+  journal={arXiv preprint arXiv:2310.09259},
+  year={2023}
+}
+
