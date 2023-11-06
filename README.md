@@ -39,32 +39,6 @@ Then ones needs create QUIK Linear layers using `qlinear.MixedQLinear.from_float
 Now the quantized model is ready for use.
 
 
-### Quantization pipeline
-
-```python
-import torch
-
-import quik
-
-dtype = torch.half
-
-x = torch.rand((input_size, hidden_size)).cuda().to(dtype)
-int_indices, fp_indices = ...  # extract from the SmoothQuant activations.
-weight_matrix == ...  # original weights
-reduced_w = torch.sum(weight_matrix[:, int_indices].float(), dim=1, keepdim=True).to(weight_matrix.dtype)
-int_weight = ...  # weights are split according to indices and quantized using GPTQ 
-fp_weight = weight_matrix[:, fp_indices]  # the weights that are kept in full precision
-weights_scales = ...  # scales from GPTQ
-
-BITS = 4
-q_int, meta, fp_x = quik.asymmetric.quantize(x.cuda().half(), int_indices, fp_indices, BITS)
-int_result = quik.matmul.int4Matmul(qint_x, int_weight)
-fp_result = torch.nn.functional.linear(fp_x, fp_weight)
-
-output = quik.asymmetric.dequantize(int_result, meta, weights_scales,
-                                    reduced_w, fp_result, BITS)
-```
-
 ### Fake Quantization examples
 
 To run the fake quantization example, check [`fake_quant`](https://github.com/IST-DASLab/QUIK/tree/master/experiments/fake_quant) directory.
