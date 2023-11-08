@@ -16,7 +16,7 @@ https://arxiv.org/abs/2310.09259
 ### Instructions
 
 ```bash
-git clone git@github.com:IST-DASLab/QUIK.git
+git clone https://github.com/IST-DASLab/QUIK.git
 cd QUIK
 pip install -e .  # or pip install .
 ```
