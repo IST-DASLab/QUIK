@@ -22,13 +22,13 @@ You can simply run the above files to reproduce the results in the paper. The ma
 - `--model`: the model name (or path to the weights)
 - `--dataset`: the calibration dataset for GPTQ quantization
 - `--fp_features`: the number of outliers (should be saved in `act_scales` directory)
-- `--fp_relative`: Wheather we want to use more outliers (proportional to the number of input features) in the `down_proj` or `fc2` in LLaMA-2 and Falcon models.
-- `--int8_down_proj`: Wheather we want to use int8 quantization for `down_proj`  in LLaMA-2 models.
-- `--int8_fc2`: Wheather we want to use int8 quantization for `fc2`  in Falcon models.
+- `--fp_relative`: Whether we want to use more outliers (proportional to the number of input features) in the `down_proj` or `fc2` in LLaMA-2 and Falcon models.
+- `--int8_down_proj`: Whether we want to use int8 quantization for `down_proj`  in LLaMA-2 models.
+- `--int8_fc2`: Whether we want to use int8 quantization for `fc2`  in Falcon models.
 - `--hf_token`: HuggingFace token for accessing to the LLaMA-2 and Falcon models.
 - `--a_bits`: the number of bits for activation quantization
 - `--w_bits`: the number of bits for weight quantization
-- `--w_clip`: Wheather we want to clip the weights
+- `--w_clip`: Whether we want to clip the weights
 - `sparsity`: Sparse weights using SparseGPT (for Falcon models)
 - `prunen`: N for N:M using SparseGPT (for Falcon models)
 - `prunem`: M for N:M using SparseGPT (for Falcon models)
