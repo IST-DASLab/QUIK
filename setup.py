@@ -7,6 +7,7 @@ import sys
 import sysconfig
 
 from setuptools import setup
+from setuptools import setup, find_packages
 import subprocess
 
 try:
@@ -135,6 +136,7 @@ try:
     setup(
         name='quik',
         version=version.__version__,
+        packages=find_packages(exclude=("include", "src", "test")),
         **ext_kwargs,
     )
 finally:
